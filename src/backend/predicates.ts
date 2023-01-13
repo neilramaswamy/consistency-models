@@ -147,31 +147,91 @@ export function isMonotonicReads(
     );
 }
 
+function setify(ops: Operation[]) {
+    let set = new Set<string>();
+
+    for (let i = 0; i < ops.length; i++) {
+        for (let j = i + 1; j < ops.length; j++) {
+            set.add(operationTupleToString(ops[i], ops[j]));
+        }
+    }
+
+    return set;
+}
+
 export function isWritesFollowReads(
     history: History,
     systemSerialization: SystemSerialization
 ): boolean {
-    // function getCausalDependencies() {
-    //     let valueMap: {[key: number]: Operation} = {}
+    let valueMap: { [key: number]: Operation } = {};
 
-    //     everySerialization(systemSerialization, (processId, serialization) => {
-    //         serialization.forEach(op => {
-    //             if (op.type === OperationType.Write) {
-    //                 valueMap[op.value] = op;
-    //             }
-    //         })
-    //     })
+    everySerialization(systemSerialization, (processId, serialization) => {
+        serialization.forEach(op => {
+            if (op.type === OperationType.Write) {
+                valueMap[op.value] = op;
+            }
+        });
 
-    //     everySerialization(systemSerialization, (processId, serialization) => {
-    //         serialization.forEach(op => {
-    //             if (op.type === OperationType.Read) {
+        return true;
+    });
 
-    //             }
-    //         })
-    //     })
-    // }
+    // Now iterate through every operation in every serialization
+    let causalWrites: Set<string> = new Set();
 
-    return false;
+    everySerialization(systemSerialization, (processId, serialization) => {
+        for (let i = 0; i < serialization.length; i++) {
+            const op = serialization[i];
+
+            if (op.type == OperationType.Read) {
+                const associatedWrite = valueMap[op.value];
+
+                if (associatedWrite === undefined) {
+                    // We read something we never wrote
+                    // TODO(neil): Should we throw an error here?
+                    return false;
+                } else {
+                    // Subsequent writes need to come after associatedWrite
+                    for (let j = i + 1; j < serialization.length; j++) {
+                        if (serialization[j].type == OperationType.Write) {
+                            const futureWrite = serialization[j];
+
+                            causalWrites.add(
+                                operationTupleToString(
+                                    associatedWrite,
+                                    futureWrite
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    });
+
+    // Make sure causalWrites are respected by every serialization
+    return everySerialization(
+        systemSerialization,
+        (processId, serialization) => {
+            const onlyWrites = serialization.filter(
+                op => op.type === OperationType.Write
+            );
+            const onlyWritesSet = setify(onlyWrites);
+
+            return isSubset(onlyWritesSet, causalWrites);
+        }
+    );
+}
+
+function isSubset(set1: Set<string>, set2: Set<string>) {
+    for (let elem of set1) {
+        if (!set2.has(elem)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 export function isSingleOrder(
@@ -227,6 +287,10 @@ export function isCausal(
     };
 }
 
+export function operationTupleToString(a: Operation, b: Operation) {
+    return `${a.operationName} ${b.operationName}`;
+}
+
 export function isSequential(
     history: History,
     systemSerialization: SystemSerialization
@@ -249,10 +313,6 @@ export function isRealTime(
     // Not defined without an arbitration order
     if (!isSingleOrder(history, systemSerialization)) {
         return false;
-    }
-
-    function operationTupleToString(a: Operation, b: Operation) {
-        return `${a.operationName} ${b.operationName}`;
     }
 
     const arbitration = systemSerialization[0];
