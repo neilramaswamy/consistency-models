@@ -43,6 +43,33 @@ function filterNonProcessOperations(
     return serialization.filter(s => history[processId].includes(s));
 }
 
+export function isRval(
+    history: History,
+    systemSerialization: SystemSerialization
+): boolean {
+    return everySerialization(
+        systemSerialization,
+        (processId, serialization) => {
+            let lastValue: number | null = null;
+
+            for (let i = 0; i < serialization.length; i++) {
+                const op = serialization[i];
+
+                if (op.type === OperationType.Write) {
+                    lastValue = op.value;
+                } else {
+                    // Includes the case when lastValue === null
+                    if (lastValue !== op.value) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+    );
+}
+
 export function isReadYourWrites(
     history: History,
     systemSerialization: SystemSerialization
@@ -219,12 +246,59 @@ export function isRealTime(
     history: History,
     systemSerialization: SystemSerialization
 ): boolean {
-    return false;
+    // Not defined without an arbitration order
+    if (!isSingleOrder(history, systemSerialization)) {
+        return false;
+    }
+
+    function operationTupleToString(a: Operation, b: Operation) {
+        return `${a.operationName} ${b.operationName}`;
+    }
+
+    const arbitration = systemSerialization[0];
+
+    // Create a set out of the arbitration order
+    let arbitrationSet: Set<string> = new Set();
+    for (let i = 0; i < arbitration.length; i++) {
+        for (let j = i + 1; j < arbitration.length; j++) {
+            arbitrationSet.add(
+                operationTupleToString(arbitration[i], arbitration[j])
+            );
+        }
+    }
+
+    // Make sure that the returns before relation is a subset of the arbitration order
+    const allOperations = Object.values(history).flat();
+    for (let i = 0; i < allOperations.length; i++) {
+        for (let j = i + 1; j < allOperations.length; j++) {
+            const returnsBefore =
+                allOperations[i].endTime < allOperations[j].endTime;
+
+            if (returnsBefore) {
+                const inArbitration = arbitrationSet.has(
+                    operationTupleToString(allOperations[i], allOperations[j])
+                );
+
+                if (!inArbitration) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
 }
 
 export function isLinearizable(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    return false;
+) {
+    const sequential = isSequential(history, systemSerialization);
+    const realTime = isRealTime(history, systemSerialization);
+
+    return {
+        sequential,
+        isRealTime: realTime,
+        isLinearizable: sequential && realTime,
+    };
 }

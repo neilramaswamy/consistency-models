@@ -36,3 +36,5 @@ Determined offline
 
 -   In Read-your-writes, do you need to read one of the values that YOU wrote in your serialization,
     or can it be any value that was written (in your serialization)?
+
+# Observations
