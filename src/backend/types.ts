@@ -10,6 +10,9 @@ export enum OperationType {
 export interface Operation {
     type: OperationType;
 
+    // Short string (i.e. a character) to uniquely identify the event
+    operationName: string;
+
     // Value being written, or value being read
     value: number;
 

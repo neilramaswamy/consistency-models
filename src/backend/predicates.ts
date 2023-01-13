@@ -1,5 +1,5 @@
 // some helper functions
-import { write } from "fs";
+import { read, write } from "fs";
 import {
     History,
     SystemSerialization,
@@ -77,6 +77,7 @@ export function isMonotonicWrites(
         // filter by process, and make sure that our serialization wrote in the same order the program did
         return everyProcessHistory(history, (processId, operations) => {
             let lastIndex = -1;
+
             return operations.every(op => {
                 const nextIndex = writes.indexOf(op);
                 const isNext = nextIndex > lastIndex;
@@ -97,6 +98,7 @@ export function isMonotonicReads(
             let writes = serialization
                 .filter(s => s.type == OperationType.Write)
                 .map(s => s.value);
+
             const reads = serialization.filter(
                 s => s.type == OperationType.Read
             );
@@ -122,6 +124,26 @@ export function isWritesFollowReads(
     history: History,
     systemSerialization: SystemSerialization
 ): boolean {
+    // function getCausalDependencies() {
+    //     let valueMap: {[key: number]: Operation} = {}
+
+    //     everySerialization(systemSerialization, (processId, serialization) => {
+    //         serialization.forEach(op => {
+    //             if (op.type === OperationType.Write) {
+    //                 valueMap[op.value] = op;
+    //             }
+    //         })
+    //     })
+
+    //     everySerialization(systemSerialization, (processId, serialization) => {
+    //         serialization.forEach(op => {
+    //             if (op.type === OperationType.Read) {
+
+    //             }
+    //         })
+    //     })
+    // }
+
     return false;
 }
 
@@ -129,30 +151,70 @@ export function isSingleOrder(
     history: History,
     systemSerialization: SystemSerialization
 ): boolean {
-    return false;
+    if (Object.keys(systemSerialization).length === 0) {
+        return false;
+    }
+
+    const firstSerialization = systemSerialization[0]
+        .map(s => s.operationName)
+        .join(" ");
+
+    return everySerialization(
+        systemSerialization,
+        (processId, serialization) => {
+            return (
+                serialization.map(s => s.operationName).join(" ") ===
+                firstSerialization
+            );
+        }
+    );
 }
 
 export function isPRAM(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    return false;
+) {
+    const monotonicReads = isMonotonicReads(history, systemSerialization);
+    const monoticWrites = isMonotonicWrites(history, systemSerialization);
+    const readYourWrites = isReadYourWrites(history, systemSerialization);
+
+    return {
+        isMonotonicReads: monotonicReads,
+        isMonotonicWrites: monoticWrites,
+        isReadYourWrites: readYourWrites,
+        isPRAM: monotonicReads && monoticWrites && readYourWrites,
+    };
 }
 
 export function isCausal(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    return false;
+) {
+    const pram = isPRAM(history, systemSerialization);
+    const writesFollowReads = isWritesFollowReads(history, systemSerialization);
+
+    return {
+        pram: pram,
+        isWritesFollowReads: writesFollowReads,
+        isCausal: pram && writesFollowReads,
+    };
 }
 
 export function isSequential(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    return false;
+) {
+    const causal = isCausal(history, systemSerialization);
+    const singleOrder = isSingleOrder(history, systemSerialization);
+
+    return {
+        causal,
+        isSingleOrder: singleOrder,
+    };
 }
 
+// Unfortunately, this type signature doesn't conform to all the other type signatures, but that's
+// because RealTime is defined using the arbitration order.
 export function isRealTime(
     history: History,
     systemSerialization: SystemSerialization
