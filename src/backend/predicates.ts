@@ -1,5 +1,4 @@
 // some helper functions
-import { read, write } from "fs";
 import {
     History,
     SystemSerialization,
@@ -165,8 +164,8 @@ export function isWritesFollowReads(
 ): boolean {
     let valueMap: { [key: number]: Operation } = {};
 
-    everySerialization(systemSerialization, (processId, serialization) => {
-        serialization.forEach(op => {
+    everyProcessHistory(history, (processId, operations) => {
+        operations.forEach(op => {
             if (op.type === OperationType.Write) {
                 valueMap[op.value] = op;
             }
@@ -178,9 +177,9 @@ export function isWritesFollowReads(
     // Now iterate through every operation in every serialization
     let causalWrites: Set<string> = new Set();
 
-    everySerialization(systemSerialization, (processId, serialization) => {
-        for (let i = 0; i < serialization.length; i++) {
-            const op = serialization[i];
+    everyProcessHistory(history, (processId, operations) => {
+        for (let i = 0; i < operations.length; i++) {
+            const op = operations[i];
 
             if (op.type == OperationType.Read) {
                 const associatedWrite = valueMap[op.value];
@@ -191,9 +190,9 @@ export function isWritesFollowReads(
                     return false;
                 } else {
                     // Subsequent writes need to come after associatedWrite
-                    for (let j = i + 1; j < serialization.length; j++) {
-                        if (serialization[j].type == OperationType.Write) {
-                            const futureWrite = serialization[j];
+                    for (let j = i + 1; j < operations.length; j++) {
+                        if (operations[j].type == OperationType.Write) {
+                            const futureWrite = operations[j];
 
                             causalWrites.add(
                                 operationTupleToString(
