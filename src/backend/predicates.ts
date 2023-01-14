@@ -20,9 +20,10 @@ function everySerialization(
     systemSerialization: SystemSerialization,
     callback: (processId: string, serialization: Serialization) => boolean
 ) {
-    return Object.entries(systemSerialization).every(([id, serialization]) =>
-        callback(id, serialization)
-    );
+    return Object.entries(systemSerialization).every(([id, serialization]) => {
+        const val = callback(id, serialization);
+        return val;
+    });
 }
 
 function anySerialization(
@@ -100,16 +101,18 @@ export function isMonotonicWrites(
     return everySerialization(systemSerialization, (process, serialization) => {
         const writes = serialization.filter(s => s.type == OperationType.Write);
 
-        // filter by process, and make sure that our serialization wrote in the same order the program did
+        // Every processes' writes should be a subsequence of the current serialization
         return everyProcessHistory(history, (processId, operations) => {
             let lastIndex = -1;
 
-            return operations.every(op => {
-                const nextIndex = writes.indexOf(op);
-                const isNext = nextIndex > lastIndex;
-                lastIndex = nextIndex;
-                return isNext;
-            });
+            return operations
+                .filter(op => op.type == OperationType.Write)
+                .every(writeOp => {
+                    const nextIndex = writes.indexOf(writeOp);
+                    const isNext = nextIndex > lastIndex;
+                    lastIndex = nextIndex;
+                    return isNext;
+                });
         });
     });
 }
