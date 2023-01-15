@@ -1,4 +1,10 @@
-import { isPRAM, isWritesFollowReads } from "./predicates";
+import {
+    isRval,
+    isCausal,
+    isPRAM,
+    isSingleOrder,
+    isWritesFollowReads,
+} from "./predicates";
 import { describe, test, expect } from "@jest/globals";
 import { generateHistoryFromString, generateSerialization } from "./util";
 
@@ -87,6 +93,35 @@ describe("PRAM", () => {
     });
 });
 
+describe("sequential consistency", () => {
+    // We will always expect: A -> C, and A -> D
+    const history = generateHistoryFromString(`
+    ----[A:x<-1]---------------------------------
+    --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
+    `);
+
+    const cdab = generateSerialization(history, "C D A B");
+
+    const systemSerialization = { 0: cdab, 1: cdab };
+
+    // So this is confusing. systemSerialization is SingleOrder, PRAM, and RVal.
+    //
+    // According to http://jepsen.io/consistency/models/sequential, this means it is sequentially
+    // consistent. This makes sense. However, it is not the case that it is causal. This means
+    // that sequential consistency does not imply causal (and we know that causal is not sequential
+    // but we always knew this).
+
+    expect(isSingleOrder(history, systemSerialization)).toEqual(true);
+    expect(isPRAM(history, systemSerialization)).toHaveProperty("isPRAM", true);
+    expect(isRval(history, systemSerialization)).toEqual(true);
+
+    expect(isWritesFollowReads(history, systemSerialization)).toBe(false);
+    expect(isCausal(history, systemSerialization)).toHaveProperty(
+        "isCausal",
+        false
+    );
+});
+
 describe("writes follow reads", () => {
     // We will always expect: A -> C, and A -> D
     const history = generateHistoryFromString(`
@@ -100,7 +135,7 @@ describe("writes follow reads", () => {
     const adcb = generateSerialization(history, "A D C B");
     const acdb = generateSerialization(history, "A C D B");
 
-    const cadb = generateSerialization(history, "C D A B");
+    const cdab = generateSerialization(history, "C D A B");
 
     test("a linearizable serialization", () => {
         expect(isWritesFollowReads(history, { 0: abcd, 1: abcd })).toEqual(
@@ -121,7 +156,7 @@ describe("writes follow reads", () => {
     });
 
     test("one process with an out-of-order write is invalid", () => {
-        expect(isWritesFollowReads(history, { 0: abcd, 1: cadb })).toEqual(
+        expect(isWritesFollowReads(history, { 0: abcd, 1: cdab })).toEqual(
             false
         );
     });
