@@ -1,4 +1,4 @@
-import { isPRAM } from "./predicates";
+import {isPRAM, isWritesFollowReads} from "./predicates";
 import { describe, test, expect } from "@jest/globals";
 import { generateHistoryFromString, generateSerialization } from "./util";
 
@@ -85,4 +85,21 @@ describe("PRAM", () => {
             isPRAM: false,
         });
     });
+});
+
+describe("Writes follow reads", () => {
+    const history = generateHistoryFromString(`
+    ----[A:x<-1]---------------------------------
+    --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
+    `);
+
+    const abcd = generateSerialization(history, "A B C D");
+    const adcb = generateSerialization(history, "A D C B");
+
+
+    const abdc = generateSerialization(history, "A B D C");
+
+   test("ensures that if a process reads a value v, which came from a write w1 and later performs write w2, then w2 is visible after w1", () => {
+       expect(isWritesFollowReads(history, { 0: abcd, 1: abcd })).toEqual(true);
+   })
 });
