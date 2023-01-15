@@ -221,7 +221,7 @@ export function isWritesFollowReads(
             );
             const onlyWritesSet = setify(onlyWrites);
 
-            return isSubset(onlyWritesSet, causalWrites);
+            return isSubset(causalWrites, onlyWritesSet);
         }
     );
 }
