@@ -6,6 +6,7 @@
 
 .track {
     display: flex;
+    position: relative;
 }
 
 .operation {
