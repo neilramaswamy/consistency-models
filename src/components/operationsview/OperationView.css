@@ -1,0 +1,15 @@
+.operation {
+    height: 50px;
+    width: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: red;
+    --start-time: 0;
+
+    grid-area: content;
+    margin-left: calc(1% * var(--start-time));
+
+    user-select: none;
+    cursor: pointer;
+}

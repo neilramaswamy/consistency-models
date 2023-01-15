@@ -1,6 +1,8 @@
 import { Title } from "solid-start";
 import Counter from "~/components/Counter";
 import { SortableHorizontalListExample } from "~/components/Slider";
+import OperationView from "~/components/operationsview/OperationView";
+import OperationsView from "~/components/operationsview/OperationsView";
 
 export default function Home() {
     return (
@@ -15,7 +17,7 @@ export default function Home() {
                 </a>{" "}
                 to learn how to build SolidStart apps.
             </p>
-            <SortableHorizontalListExample />
+            <OperationsView />
         </main>
     );
 }
