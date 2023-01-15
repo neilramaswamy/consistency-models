@@ -1,0 +1,6 @@
+.operation-container {
+    display: grid;
+    grid:
+        "content" auto / 1fr;
+    width: 500px;
+}
