@@ -1,45 +1,31 @@
 import { Title } from "solid-start";
-import Counter from "~/components/Counter";
-import { SortableHorizontalListExample } from "~/components/Slider";
 import OperationView from "~/components/operationsview/OperationView";
 import OperationsView from "~/components/operationsview/OperationsView";
-import { OperationType } from "~/backend/types";
+import { generateSerialization, generateHistoryFromString } from "~/backend/util";
+import {ResultsTree} from "~/components/ResultsTree";
 
 export default function Home() {
+    const history = generateHistoryFromString(`
+    ----[A:x<-  1]---------------------------------------
+    ----------------[B:x->  1]---[C:x<-  2]---[D:x<-  3]-
+    `);
+
+    const abcd = generateSerialization(history, "A B C D");
+    const serializ = { 0: abcd, 1: abcd };
     return (
         <main>
             <Title>Consistency Models</Title>
 
             <OperationsView
                 title="History"
-                operations={{
-                0: [
-                    {type: OperationType.Write, value: 3, operationName: "A", startTime: 0, endTime: 10},
-                    {type: OperationType.Read, value: 3, operationName: "C", startTime: 40, endTime: 50},
-                    {type: OperationType.Read, value: 1, operationName: "D", startTime: 65, endTime: 85},
-                    ],
-                1: [
-                    {type: OperationType.Write, value: 1, operationName: "B", startTime: 20, endTime: 33},
-                    ],
-            }}/>
+                operations={history}/>
 
             <OperationsView
                 title="Serializations"
                 operationsDraggable
-                operations={{
-                0: [
-                    {type: OperationType.Write, value: 3, operationName: "A", startTime: 0, endTime: 10},
-                    {type: OperationType.Write, value: 1, operationName: "B", startTime: 20, endTime: 33},
-                    {type: OperationType.Read, value: 3, operationName: "C", startTime: 40, endTime: 50},
-                    {type: OperationType.Read, value: 1, operationName: "D", startTime: 65, endTime: 85},
-                    ],
-                    1: [
-                    {type: OperationType.Write, value: 3, operationName: "A", startTime: 0, endTime: 10},
-                    {type: OperationType.Write, value: 1, operationName: "B", startTime: 20, endTime: 33},
-                    {type: OperationType.Read, value: 3, operationName: "C", startTime: 40, endTime: 50},
-                    {type: OperationType.Read, value: 1, operationName: "D", startTime: 65, endTime: 85},
-                    ],
-                }}/>
+                operations={serializ}/>
+
+            <ResultsTree history={history} systemSerialization={serializ} />
         </main>
     );
 }

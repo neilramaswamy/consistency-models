@@ -40,7 +40,7 @@ export default function OperationView({ op, draggable, canMove, onMoved }: Opera
         // and commit!
         onMoved(dragX() - leftOffset())
     }
-
+    console.log(op.value);
     return (
             <div
                 class={`operation ${op.type === OperationType.Read ? "read" : "write"} ${draggable ? "draggable" : ""}`}

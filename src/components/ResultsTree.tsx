@@ -1,27 +1,37 @@
 import {History, SystemSerialization} from "~/backend/types";
-import {createEffect} from "solid-js";
+import {createEffect, createSignal} from "solid-js";
+import {isLinearizable} from "~/backend/predicates";
 
 // todo: put this somewhere better
-const fillColor = "white";
-const fillColor = "white";
-const fillColor = "white";
+const fillColor = "green";
+const textColor = "black";
 
 export function ResultsTree({ history, systemSerialization }: ResultsTreeProps) {
     let canvasRef: HTMLCanvasElement | undefined;
+    const [result, setResult] = createSignal();
 
     function render() {
         if (!canvasRef) return;
-        const ctx = canvasRef.getContext('2d');
 
-        // clear
-        ctx.fillStyle = "white";
+        const result = isLinearizable(history, systemSerialization);
+        setResult(result);
+//        console.log(result);
+//        const ctx = canvasRef.getContext('2d');
+//
+//        // clear
+//        ctx.fillStyle = fillColor;
+//        ctx.fillRect(0, 0, 500, 500);
+//        ctx.fillStyle = textColor;
+//        ctx.font = "12px Arial"
+//        ctx.fillText(JSON.stringify(result, undefined, 4), 10, 50);
     }
 
     createEffect(() => {
         render();
     })
 
-    return <canvas ref={canvasRef}/>
+   // return <canvas width={500} height={500} ref={canvasRef}/>
+    return <pre style={{"text-align": "start"}}>{JSON.stringify(isLinearizable(history, systemSerialization), undefined, 4)}</pre>
 }
 
 interface ResultsTreeProps {

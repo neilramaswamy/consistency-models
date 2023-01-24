@@ -50,7 +50,7 @@ export const generateSessionProjection = (
         ): Operation[] => {
     let operations: Operation[] = [];
 
-    const regex = /\[([A-Z]):([a-z])(<-|->)(\d)\]/g;
+    const regex = /\[([A-Z]):([a-z])(<-|->)\s*(\d)\]/g;
     const matches = line.matchAll(regex);
 
     for (const match of matches) {
@@ -58,7 +58,6 @@ export const generateSessionProjection = (
         // const obj = match[2];
         const arrow = match[3];
         const value = parseInt(match[4], 10);
-
         // assert(
         //     match.index !== undefined,
         //     `Match index was undefined for ${match}`
@@ -67,7 +66,7 @@ export const generateSessionProjection = (
         const type = arrow === "->" ? OperationType.Read : OperationType.Write;
 
         const startTime = match.index || 0;
-        // Subtract one since the end time is inclusive
+        // Subtract one since the end time is inclusive and then just add a bit
         const endTime = startTime + match[0].length - 1;
 
         operations.push({
