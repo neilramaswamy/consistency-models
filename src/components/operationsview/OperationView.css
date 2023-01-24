@@ -1,16 +1,50 @@
 .operation {
     --start-time: 0;
     --end-time: 0;
-    height: 50px;
-    width: calc(1% * calc(var(--end-time) - var(--start-time)));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: red;
 
     grid-area: content;
+    width: calc(1% * calc(var(--end-time) - var(--start-time)));
     margin-left: calc(1% * var(--start-time));
 
     user-select: none;
+
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: stretch;
+    border-radius: 2px;
+    color: white;
+    overflow: hidden;
+    justify-content: flex-start;
+    box-shadow: 0 0 3px rgb(0 0 0 / 70%);
+}
+
+.draggable {
     cursor: pointer;
+}
+
+.name {
+    background: #373737;
+    padding: 8px 5px;
+
+    display: flex;
+    align-items: center;
+}
+
+.operation.write {
+    background: #4caf50;
+}
+
+.operation.read {
+    background: #f44336;
+}
+
+.info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon {
+    font-size: 18px;
+    margin: 0 4px;
 }

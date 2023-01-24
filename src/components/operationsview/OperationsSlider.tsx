@@ -4,20 +4,36 @@ import {Operation} from "~/backend/types";
 import OperationView from "~/components/operationsview/OperationView";
 
 
-export default function OperationsSlider({ operations: ops, onOperationMoved }: OperationsSliderProps) {
+export default function OperationsSlider({ operations: ops, onOperationMoved, operationsDraggable }: OperationsSliderProps) {
     const [bounds, setBounds] = createSignal<DOMRect>();
 
-    function canMove(px: number, op: Operation): boolean {
+    function canMove(px: number | undefined, op: Operation, suggest: boolean = true): { allowed: boolean, suggestedPosition?: number } {
+        if (!px) return { allowed: false };
+
         // can we move here?
         const operationLeft = pxToTrackUnits(px);
-        const operationEnd = operationLeft + (op.endTime - op.startTime);
+        const operationWidth = (op.endTime - op.startTime);
+        const operationEnd = operationLeft + operationWidth;
 
-        return operationLeft >= 0 && operationEnd <= 100 && ops
+        const intersections = [];
+
+        function trySuggest(num: number) {
+            if (!suggest) return undefined;
+
+            const px = trackUnitsToPx(num);
+            return canMove(px, op, false).allowed ? px : undefined;
+        }
+
+        if (operationLeft < 0) return { allowed: false, suggestedPosition: trySuggest(0) };
+        if (operationEnd > 100) return { allowed: false, suggestedPosition: trySuggest(100 - operationWidth) };
+
+        return ops
             .filter(op2 => op2.operationName !== op.operationName)
-            .every(o => {
+            .reduce((a, e) => {
+                if (!a.allowed) return a;
                 // check if we intersect with this other operation
-                return operationLeft > o.endTime || operationEnd < o.startTime;
-            })
+                return { allowed: operationLeft > e.endTime || operationEnd < e.startTime };
+                }, { allowed: true });
     }
 
     function pxToTrackUnits(px: number) {
@@ -28,6 +44,12 @@ export default function OperationsSlider({ operations: ops, onOperationMoved }: 
         return (adjusted / rectBounds.width) * 100;
     }
 
+    function trackUnitsToPx(tu: number) {
+        const rectBounds = bounds();
+        if (!rectBounds) return 0;
+        return ((tu / 100) * rectBounds.width) + rectBounds.left;
+    }
+
     return (<div class="operation-container" ref={(div) => {
         // i swear this is actually recommended https://github.com/solidjs/solid/issues/116
         setTimeout(() => setBounds(div.getBoundingClientRect()));
@@ -35,13 +57,16 @@ export default function OperationsSlider({ operations: ops, onOperationMoved }: 
         {ops.map(o => <OperationView
             op={o}
             canMove={(px) => canMove(px, o)}
+            draggable={operationsDraggable}
             onMoved={(px) => onOperationMoved(o, pxToTrackUnits(px))}/>)}
-        </div>
-    );
+        <div class="operation-track"></div>
+    </div>);
 }
 
 interface OperationsSliderProps {
     operations: Operation[];
+
+    operationsDraggable?: boolean;
 
     onOperationMoved(op: Operation, start: number): unknown;
 }

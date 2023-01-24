@@ -1,19 +1,29 @@
-import { Operation } from "~/backend/types";
+import {Operation, OperationType, SystemSerialization} from "~/backend/types";
 import OperationsSlider from "./OperationsSlider";
-import {createSignal} from "solid-js";
+import "./OperationsView.css";
 
-export default function OperationsView() {
-    const [ops, setOps] = createSignal<Operation[]>([
-        {operationName: "a", startTime: 0, endTime: 10},
-        {operationName: "b", startTime: 20, endTime: 30},
-        {operationName: "c", startTime: 40, endTime: 50},
-        {operationName: "d", startTime: 60, endTime: 70},
-        ] as any as Operation[])
-
+export default function OperationsView({ operations, title, operationsDraggable }: OperationViewProps) {
     function operationMoved(op: Operation, newStart: number) {
-        op.startTime = newStart;
-        setOps([...ops()])
+        console.log("I have moved!!");
+//        op.endTime = newStart + (op.endTime - op.startTime);
+//        op.startTime = newStart;
     }
 
-    return <OperationsSlider operations={ops()} onOperationMoved={operationMoved} />
+    return <div class="ops-view">
+        <h2 class="view-title">{title}</h2>
+        {Object.entries(operations).map(([procId, ops]) => (
+            <div class="op-slider-container">
+                <span class="op-slider-title">Process {procId}</span>
+                <OperationsSlider operations={ops} onOperationMoved={operationMoved} operationsDraggable={operationsDraggable}/>
+            </div>)
+        )}
+    </div>
+}
+
+interface OperationViewProps {
+    title: string;
+
+    operations: SystemSerialization | History;
+
+    operationsDraggable?: boolean;
 }

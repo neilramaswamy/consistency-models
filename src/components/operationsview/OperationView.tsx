@@ -1,8 +1,8 @@
 import {createSignal} from "solid-js";
-import {Operation} from "~/backend/types";
+import {Operation, OperationType} from "~/backend/types";
 import "./OperationView.css";
 
-export default function OperationView({ op, canMove, onMoved }: OperationsSliderProps) {
+export default function OperationView({ op, draggable, canMove, onMoved }: OperationsSliderProps) {
     let operationDiv: HTMLDivElement | undefined;
     const [startX, setStartX] = createSignal<number>(0);
     const [dragX, setDragX] = createSignal<number>(0);
@@ -10,7 +10,7 @@ export default function OperationView({ op, canMove, onMoved }: OperationsSlider
     const [dragging, setDragging] = createSignal<boolean>(false);
 
     function startDrag(e: MouseEvent) {
-        if (!operationDiv) return;
+        if (!draggable || !operationDiv) return;
         const { left } = operationDiv.getBoundingClientRect();
         setDragging(true);
         setStartX(e.pageX);
@@ -22,7 +22,12 @@ export default function OperationView({ op, canMove, onMoved }: OperationsSlider
     }
 
     function moveDrag(e: MouseEvent) {
-        if (!canMove(e.pageX - leftOffset())) return;
+        const moveResult = canMove(e.pageX - leftOffset());
+
+        if (!moveResult.allowed) {
+            if (moveResult.suggestedPosition) setDragX(leftOffset() + moveResult.suggestedPosition);
+            return;
+        }
         setDragX(e.pageX);
     }
 
@@ -38,21 +43,30 @@ export default function OperationView({ op, canMove, onMoved }: OperationsSlider
 
     return (
             <div
-                class="operation"
+                class={`operation ${op.type === OperationType.Read ? "read" : "write"} ${draggable ? "draggable" : ""}`}
                 ref={operationDiv}
                 style={{
                     "--start-time": op.startTime,
                     "--end-time": op.endTime,
                     "transform": dragging() ? `translateX(${dragX() - startX()}px)` : ""
                 }}
-                onmousedown={startDrag}>{op.operationName}</div>
+                onmousedown={startDrag}>
+                <span class="name">{op.operationName}</span>
+                <div class="info">
+                    <span class="variable">x</span>
+                    <span class="material-symbols-outlined icon">{op.type === OperationType.Read ? "east" : "west"}</span>
+                    <span class="value">{op.value}</span>
+                </div>
+            </div>
     );
 }
 
 interface OperationsSliderProps {
     op: Operation;
 
-    canMove(px: number): boolean;
+    draggable?: boolean;
+
+    canMove(px: number): { allowed: boolean, suggestedPosition?: number };
 
     onMoved(px: number): unknown;
 }

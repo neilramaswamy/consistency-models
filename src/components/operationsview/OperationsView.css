@@ -1,0 +1,19 @@
+.ops-view {
+    padding: 18px;
+}
+
+.op-slider-container {
+    display: grid;
+    align-items: center;
+    gap: 4px 16px;
+    grid-template-columns: auto 1fr;
+    margin: 24px 0;
+}
+
+.op-slider-title {
+    font-size: 1.1em;
+}
+
+.view-title {
+    text-align: start;
+}
