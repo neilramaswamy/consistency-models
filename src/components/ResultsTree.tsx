@@ -6,15 +6,14 @@ import {isLinearizable} from "~/backend/predicates";
 const fillColor = "green";
 const textColor = "black";
 
-export function ResultsTree({ history, systemSerialization }: ResultsTreeProps) {
+export function ResultsTree(props: ResultsTreeProps) {
     let canvasRef: HTMLCanvasElement | undefined;
     const [result, setResult] = createSignal();
 
     function render() {
-        if (!canvasRef) return;
+       // if (!canvasRef) return;
+//        const result = isLinearizable(props.history, props.systemSerialization);
 
-        const result = isLinearizable(history, systemSerialization);
-        setResult(result);
 //        console.log(result);
 //        const ctx = canvasRef.getContext('2d');
 //
@@ -31,7 +30,7 @@ export function ResultsTree({ history, systemSerialization }: ResultsTreeProps) 
     })
 
    // return <canvas width={500} height={500} ref={canvasRef}/>
-    return <pre style={{"text-align": "start"}}>{JSON.stringify(isLinearizable(history, systemSerialization), undefined, 4)}</pre>
+    return <pre style={{"text-align": "start"}}>{JSON.stringify(isLinearizable(props.history, props.systemSerialization), undefined, 4)}</pre>
 }
 
 interface ResultsTreeProps {

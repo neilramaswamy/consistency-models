@@ -1,4 +1,4 @@
-import { History, Operation, OperationType } from "./types";
+import {History, Operation, OperationType, SystemSerialization} from "./types";
 
 /**
 * Takes a string-based representation of an operation history and returns an OperationHistory that
@@ -94,8 +94,16 @@ export const generateSerialization = (
     const map: { [key: string]: Operation } = {};
     Object.values(history)
         .flatMap(_ => _)
-        .forEach(operation => (map[operation.operationName] = operation));
+        .forEach(operation => (map[operation.operationName] = {...operation}));
 
     const operationIds = serialization.split(" ");
     return operationIds.map(operationId => map[operationId]);
 };
+
+export const sortOperations = (ops: History | SystemSerialization) => {
+    Object.values(ops).forEach((arr: Operation[]) => {
+        arr.sort((a,b) => a.startTime - b.startTime);
+    })
+
+    return ops;
+}

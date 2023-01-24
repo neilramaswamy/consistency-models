@@ -108,7 +108,7 @@ export function isMonotonicWrites(
             return operations
                 .filter(op => op.type == OperationType.Write)
                 .every(writeOp => {
-                    const nextIndex = writes.indexOf(writeOp);
+                    const nextIndex = writes.findIndex(o => o.operationName === writeOp.operationName);
                     const isNext = nextIndex > lastIndex;
                     lastIndex = nextIndex;
                     return isNext;

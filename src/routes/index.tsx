@@ -3,7 +3,7 @@ import OperationView from "~/components/operationsview/OperationView";
 import OperationsView from "~/components/operationsview/OperationsView";
 import { generateSerialization, generateHistoryFromString } from "~/backend/util";
 import {ResultsTree} from "~/components/ResultsTree";
-import {createSignal} from "solid-js";
+import {createEffect, createSignal} from "solid-js";
 import { SystemSerialization } from "~/backend/types";
 
 export default function Home() {

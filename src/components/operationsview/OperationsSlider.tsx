@@ -4,7 +4,7 @@ import {Operation} from "~/backend/types";
 import OperationView from "~/components/operationsview/OperationView";
 
 
-export default function OperationsSlider({ operations: ops, onOperationMoved, operationsDraggable }: OperationsSliderProps) {
+export default function OperationsSlider(props: OperationsSliderProps) {
     const [bounds, setBounds] = createSignal<DOMRect>();
 
     function canMove(px: number | undefined, op: Operation, suggest: boolean = true): { allowed: boolean, suggestedPosition?: number } {
@@ -27,9 +27,9 @@ export default function OperationsSlider({ operations: ops, onOperationMoved, op
         if (operationLeft < 0) return { allowed: false, suggestedPosition: trySuggest(0) };
         if (operationEnd > 100) return { allowed: false, suggestedPosition: trySuggest(100 - operationWidth) };
 
-        return ops
+        return props.operations
             .filter(op2 => op2.operationName !== op.operationName)
-            .reduce((a, e) => {
+            .reduce<{ allowed: boolean }>((a, e) => {
                 if (!a.allowed) return a;
                 // check if we intersect with this other operation
                 return { allowed: operationLeft > e.endTime || operationEnd < e.startTime };
@@ -54,11 +54,11 @@ export default function OperationsSlider({ operations: ops, onOperationMoved, op
         // i swear this is actually recommended https://github.com/solidjs/solid/issues/116
         setTimeout(() => setBounds(div.getBoundingClientRect()));
     }}>
-        {ops.map(o => <OperationView
+        {props.operations.map(o => <OperationView
             op={o}
             canMove={(px) => canMove(px, o)}
-            draggable={operationsDraggable}
-            onMoved={(px) => onOperationMoved(o, pxToTrackUnits(px))}/>)}
+            draggable={props.operationsDraggable}
+            onMoved={(px) => props.onOperationMoved(o, pxToTrackUnits(px))}/>)}
         <div class="operation-track"></div>
     </div>);
 }
