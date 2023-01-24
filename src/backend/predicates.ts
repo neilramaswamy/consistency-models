@@ -108,7 +108,9 @@ export function isMonotonicWrites(
             return operations
                 .filter(op => op.type == OperationType.Write)
                 .every(writeOp => {
-                    const nextIndex = writes.findIndex(o => o.operationName === writeOp.operationName);
+                    const nextIndex = writes.findIndex(
+                        o => o.operationName === writeOp.operationName
+                    );
                     const isNext = nextIndex > lastIndex;
                     lastIndex = nextIndex;
                     return isNext;
@@ -298,11 +300,14 @@ export function isSequential(
     systemSerialization: SystemSerialization
 ) {
     const causal = isCausal(history, systemSerialization);
+    const rval = isRval(history, systemSerialization);
     const singleOrder = isSingleOrder(history, systemSerialization);
 
     return {
         causal,
+        isRval: rval,
         isSingleOrder: singleOrder,
+        isSequential: causal && rval && singleOrder,
     };
 }
 
@@ -332,7 +337,7 @@ export function isRealTime(
     // Make sure that the returns before relation is a subset of the arbitration order
     const allOperations = Object.values(history).flat();
     for (let i = 0; i < allOperations.length; i++) {
-        for (let j = i + 1; j < allOperations.length; j++) {
+        for (let j = 0; j < allOperations.length; j++) {
             const returnsBefore =
                 allOperations[i].endTime < allOperations[j].endTime;
 
@@ -361,6 +366,6 @@ export function isLinearizable(
     return {
         sequential,
         isRealTime: realTime,
-        isLinearizable: sequential && realTime,
+        isLinearizable: sequential.isSequential && realTime,
     };
 }

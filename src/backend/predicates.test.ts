@@ -4,6 +4,7 @@ import {
     isPRAM,
     isSingleOrder,
     isWritesFollowReads,
+    isLinearizable,
 } from "./predicates";
 import { describe, test, expect } from "@jest/globals";
 import { generateHistoryFromString, generateSerialization } from "./util";
@@ -205,5 +206,31 @@ describe("writes follow reads", () => {
         expect(isWritesFollowReads(history2, { 0: cdefab, 1: abcdef })).toEqual(
             false
         );
+    });
+});
+
+describe("linearizability", () => {
+    const history = generateHistoryFromString(`
+    ---[A:x<-1]----------------------------[D:x->2]-
+    ---------------[B:x<-2]----[C:x<-3]-------------
+    `);
+
+    const abcd = generateSerialization(history, "A B C D");
+    const abdc = generateSerialization(history, "A B D C");
+
+    test("a non-linearizable serialization can be real-time but not RVal", () => {
+        const linearizability = isLinearizable(history, { 0: abcd, 1: abcd });
+
+        expect(linearizability.sequential.isRval).toBe(false);
+        expect(linearizability.sequential.isSequential).toBe(false);
+        expect(linearizability.isRealTime).toBe(true);
+    });
+
+    test("a non-linearizable serialization can be RVal but not real-time", () => {
+        const linearizability = isLinearizable(history, { 0: abdc, 1: abdc });
+
+        expect(linearizability.isRealTime).toBe(false);
+        expect(linearizability.isLinearizable).toBe(false);
+        expect(linearizability.sequential.isSequential).toBe(true);
     });
 });
