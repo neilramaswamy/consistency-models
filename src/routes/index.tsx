@@ -3,6 +3,8 @@ import OperationView from "~/components/operationsview/OperationView";
 import OperationsView from "~/components/operationsview/OperationsView";
 import { generateSerialization, generateHistoryFromString } from "~/backend/util";
 import {ResultsTree} from "~/components/ResultsTree";
+import {createSignal} from "solid-js";
+import { SystemSerialization } from "~/backend/types";
 
 export default function Home() {
     const history = generateHistoryFromString(`
@@ -10,8 +12,11 @@ export default function Home() {
     ----------------[B:x->  1]---[C:x<-  2]---[D:x<-  3]-
     `);
 
-    const abcd = generateSerialization(history, "A B C D");
-    const serializ = { 0: abcd, 1: abcd };
+    const abcd1 = generateSerialization(history, "A B C D");
+    const abcd2 = generateSerialization(history, "A B C D");
+
+    const [serial, setSerial] = createSignal<SystemSerialization>({ 0: abcd1, 1: abcd2 });
+
     return (
         <main>
             <Title>Consistency Models</Title>
@@ -23,9 +28,10 @@ export default function Home() {
             <OperationsView
                 title="Serializations"
                 operationsDraggable
-                operations={serializ}/>
+                operations={serial()}
+                onOperationsChanged={s => setSerial(s as SystemSerialization)}/>
 
-            <ResultsTree history={history} systemSerialization={serializ} />
+            <ResultsTree history={history} systemSerialization={serial()} />
         </main>
     );
 }
