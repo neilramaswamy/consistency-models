@@ -1,11 +1,12 @@
 .operation {
+    --start-time: 0;
+    --end-time: 0;
     height: 50px;
-    width: 50px;
+    width: calc(1% * calc(var(--end-time) - var(--start-time)));
     display: flex;
     align-items: center;
     justify-content: center;
     background: red;
-    --start-time: 0;
 
     grid-area: content;
     margin-left: calc(1% * var(--start-time));
