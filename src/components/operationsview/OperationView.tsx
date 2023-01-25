@@ -8,6 +8,8 @@ export default function OperationView(props: OperationsSliderProps) {
     const [dragX, setDragX] = createSignal<number>(0);
     const [leftOffset, setLeftOffset] = createSignal<number>(0);
     const [dragging, setDragging] = createSignal<boolean>(false);
+    const [isTransparent, setTransparent] = createSignal<boolean>(false);
+    const [lastValidPosition, setLastValidPosition] = createSignal<number>(0);
 
     function startDrag(e: MouseEvent) {
         if (!props.draggable || !operationDiv) return;
@@ -15,6 +17,7 @@ export default function OperationView(props: OperationsSliderProps) {
         setDragging(true);
         setStartX(e.pageX);
         setDragX(e.pageX);
+        setLastValidPosition(e.pageX);
         setLeftOffset(e.pageX - left);
         document.body.addEventListener("mouseup", moveEnd);
         document.body.addEventListener("mouseleave", moveEnd);
@@ -24,11 +27,14 @@ export default function OperationView(props: OperationsSliderProps) {
     function moveDrag(e: MouseEvent) {
         const moveResult = props.canMove(e.pageX - leftOffset());
 
-        if (!moveResult.allowed) {
-            if (moveResult.suggestedPosition) setDragX(leftOffset() + moveResult.suggestedPosition);
-            return;
-        }
-        setDragX(e.pageX);
+        if (!moveResult.allowed && moveResult.suggestedPosition)
+            setDragX(leftOffset() + moveResult.suggestedPosition);
+        else
+            setDragX(e.pageX);
+
+        if (moveResult.allowed) setLastValidPosition(e.pageX);
+        else if (moveResult.suggestedPosition) setLastValidPosition(leftOffset() + moveResult.suggestedPosition);
+        setTransparent(!moveResult.allowed && !moveResult.suggestedPosition);
     }
 
     function moveEnd() {
@@ -38,11 +44,11 @@ export default function OperationView(props: OperationsSliderProps) {
         document.body.removeEventListener("mousemove", moveDrag);
 
         // and commit!
-        props.onMoved(dragX() - leftOffset())
+        props.onMoved(lastValidPosition() - leftOffset())
     }
     return (
             <div
-                class={`operation ${props.op.type === OperationType.Read ? "read" : "write"} ${props.draggable ? "draggable" : ""}`}
+                class={`operation ${props.op.type === OperationType.Read ? "read" : "write"} ${props.draggable ? "draggable" : ""} ${isTransparent() ? "transparent" : ""}`}
                 ref={operationDiv}
                 style={{
                     "--start-time": props.op.startTime,
