@@ -238,6 +238,7 @@ function isSubset(set1: Set<string>, set2: Set<string>) {
     return true;
 }
 
+// Returns true if the ordering of writes on every client is the same.
 export function isSingleOrder(
     history: History,
     systemSerialization: SystemSerialization
@@ -247,6 +248,7 @@ export function isSingleOrder(
     }
 
     const firstSerialization = systemSerialization[0]
+        .filter(s => s.type === OperationType.Write)
         .map(s => s.operationName)
         .join(" ");
 
@@ -254,11 +256,50 @@ export function isSingleOrder(
         systemSerialization,
         (processId, serialization) => {
             return (
-                serialization.map(s => s.operationName).join(" ") ===
-                firstSerialization
+                serialization
+                    .filter(s => s.type === OperationType.Write)
+                    .map(s => s.operationName)
+                    .join(" ") === firstSerialization
             );
         }
     );
+}
+
+export function isClientOrder(
+    history: History,
+    systemSerialization: SystemSerialization
+): boolean {
+    return everySerialization(
+        systemSerialization,
+        (processId, serialization) => {
+            // history[processId] should be a subsequence of serialization
+            return isSubsequence(history[processId], serialization);
+        }
+    );
+}
+
+function isSubsequence(portion: Operation[], sequence: Operation[]): boolean {
+    if (portion.length > sequence.length) {
+        return false;
+    }
+
+    let j = 0;
+    PortionLoop: for (let i = 0; i < portion.length; i++) {
+        const portionCurrent = portion[i];
+
+        for (; j < sequence.length; j++) {
+            const sequenceCurrent = sequence[j];
+            if (
+                portionCurrent.operationName === sequenceCurrent.operationName
+            ) {
+                continue PortionLoop;
+            }
+        }
+
+        return false;
+    }
+
+    return true;
 }
 
 export function isPRAM(
@@ -268,12 +309,15 @@ export function isPRAM(
     const monotonicReads = isMonotonicReads(history, systemSerialization);
     const monoticWrites = isMonotonicWrites(history, systemSerialization);
     const readYourWrites = isReadYourWrites(history, systemSerialization);
+    const clientOrder = isClientOrder(history, systemSerialization);
 
     return {
         isMonotonicReads: monotonicReads,
         isMonotonicWrites: monoticWrites,
         isReadYourWrites: readYourWrites,
-        isPRAM: monotonicReads && monoticWrites && readYourWrites,
+        isClientOrder: clientOrder,
+        isPRAM:
+            monotonicReads && monoticWrites && readYourWrites && clientOrder,
     };
 }
 
@@ -287,7 +331,7 @@ export function isCausal(
     return {
         pram: pram,
         isWritesFollowReads: writesFollowReads,
-        isCausal: pram && writesFollowReads,
+        isCausal: pram.isPRAM && writesFollowReads,
     };
 }
 
@@ -307,12 +351,12 @@ export function isSequential(
         causal,
         isRval: rval,
         isSingleOrder: singleOrder,
-        isSequential: causal && rval && singleOrder,
+        isSequential: causal.pram.isPRAM && rval && singleOrder,
     };
 }
 
-// Unfortunately, this type signature doesn't conform to all the other type signatures, but that's
-// because RealTime is defined using the arbitration order.
+// Returns whether, if A returns before B, then A comes before B in all serializations.
+// However, if B is a read on serialization i, then we only check the condition for serialization i.
 export function isRealTime(
     history: History,
     systemSerialization: SystemSerialization
@@ -322,38 +366,28 @@ export function isRealTime(
         return false;
     }
 
-    const arbitration = systemSerialization[0];
+    const operationMap: { [key: string]: Operation } = {};
+    Object.values(history)
+        .flat()
+        .map(operation => (operationMap[operation.operationName] = operation));
 
-    // Create a set out of the arbitration order
-    let arbitrationSet: Set<string> = new Set();
-    for (let i = 0; i < arbitration.length; i++) {
-        for (let j = i + 1; j < arbitration.length; j++) {
-            arbitrationSet.add(
-                operationTupleToString(arbitration[i], arbitration[j])
-            );
-        }
-    }
+    return everySerialization(
+        systemSerialization,
+        (processId, serialization) => {
+            for (let i = 0; i < serialization.length; i++) {
+                for (let j = i + 1; j < serialization.length; j++) {
+                    const first = serialization[i];
+                    const second = serialization[j];
 
-    // Make sure that the returns before relation is a subset of the arbitration order
-    const allOperations = Object.values(history).flat();
-    for (let i = 0; i < allOperations.length; i++) {
-        for (let j = 0; j < allOperations.length; j++) {
-            const returnsBefore =
-                allOperations[i].endTime < allOperations[j].endTime;
-
-            if (returnsBefore) {
-                const inArbitration = arbitrationSet.has(
-                    operationTupleToString(allOperations[i], allOperations[j])
-                );
-
-                if (!inArbitration) {
-                    return false;
+                    if (first.endTime >= second.endTime) {
+                        return false;
+                    }
                 }
             }
-        }
-    }
 
-    return true;
+            return true;
+        }
+    );
 }
 
 export function isLinearizable(

@@ -5,6 +5,7 @@ import {
     isSingleOrder,
     isWritesFollowReads,
     isLinearizable,
+    isSequential,
 } from "./predicates";
 import { describe, test, expect } from "@jest/globals";
 import { generateHistoryFromString, generateSerialization } from "./util";
@@ -15,43 +16,53 @@ describe("PRAM", () => {
     --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
     `);
 
+    const acd = generateSerialization(history, "A C D");
     const abcd = generateSerialization(history, "A B C D");
+
+    const cda = generateSerialization(history, "C D A");
     const bcda = generateSerialization(history, "B C D A");
+
+    const adc = generateSerialization(history, "A D C");
+
     const cdab = generateSerialization(history, "C D A B");
     const abdc = generateSerialization(history, "A B D C");
 
     test("is true with the same linearizable sequence", () => {
-        expect(isPRAM(history, { 0: abcd, 1: abcd })).toEqual({
+        expect(isPRAM(history, { 0: acd, 1: abcd })).toEqual({
             isMonotonicReads: true,
             isMonotonicWrites: true,
             isReadYourWrites: true,
+            isClientOrder: true,
             isPRAM: true,
         });
     });
 
     test("is not met when you read before writing anything", () => {
-        expect(isPRAM(history, { 0: bcda, 1: bcda })).toEqual({
+        expect(isPRAM(history, { 0: acd, 1: bcda })).toEqual({
             isMonotonicReads: true,
             isMonotonicWrites: true,
             isReadYourWrites: false,
+            isClientOrder: true,
             isPRAM: false,
         });
     });
 
-    test("pram may have reads not consistent with program order", () => {
-        expect(isPRAM(history, { 0: cdab, 1: cdab })).toEqual({
+    test("pram may satisfy all three base predicates without client order", () => {
+        expect(isPRAM(history, { 0: cda, 1: cdab })).toEqual({
             isMonotonicReads: true,
             isMonotonicWrites: true,
             isReadYourWrites: true,
-            isPRAM: true,
+            isClientOrder: false,
+            isPRAM: false,
         });
     });
 
     test("pram is not satisfied when there are not monotonic writes", () => {
-        expect(isPRAM(history, { 0: abcd, 1: abdc })).toEqual({
+        expect(isPRAM(history, { 0: adc, 1: abcd })).toEqual({
             isMonotonicReads: true,
             isMonotonicWrites: false,
             isReadYourWrites: true,
+            isClientOrder: true,
             isPRAM: false,
         });
     });
@@ -60,35 +71,59 @@ describe("PRAM", () => {
     ----[A:x<-1]-[B:x<-2]-------------------------
     -----------------------[C:x->2]---[D:x->1]----
     `);
+    const ab = generateSerialization(history2, "A B");
+
     const abcd2 = generateSerialization(history2, "A B C D");
     const adbc2 = generateSerialization(history2, "A D B C");
     const acbd2 = generateSerialization(history2, "A C B D");
 
     test("pram is not satisfied when there are not monotonic reads", () => {
-        expect(isPRAM(history2, { 0: abcd2, 1: abcd2 })).toEqual({
+        expect(isPRAM(history2, { 0: ab, 1: abcd2 })).toEqual({
             isMonotonicReads: false,
             isMonotonicWrites: true,
             isReadYourWrites: true,
+            isClientOrder: true,
             isPRAM: false,
         });
     });
 
-    test("pram can have interleaved reads/writes in non-program order", () => {
-        expect(isPRAM(history2, { 0: adbc2, 1: adbc2 })).toEqual({
-            isMonotonicReads: true,
-            isMonotonicWrites: true,
-            isReadYourWrites: true,
-            isPRAM: true,
-        });
-    });
-
     test("full program order does not imply pram", () => {
-        expect(isPRAM(history2, { 0: acbd2, 1: acbd2 })).toEqual({
+        expect(isPRAM(history2, { 0: ab, 1: acbd2 })).toEqual({
             // TODO(neil): It's unclear how isMonotonicReads is defined if you do not read your
             // writes... For now, we set it as false.
             isMonotonicReads: false,
             isMonotonicWrites: true,
             isReadYourWrites: false,
+            isClientOrder: true,
+            isPRAM: false,
+        });
+    });
+
+    const history3 = generateHistoryFromString(`
+    ----[A:x<-1]-[B:x<-2]-------------------------
+    -----------------------[C:x->1]---[D:x->2]----
+    `);
+
+    const ab3 = generateSerialization(history3, "A B");
+    const acbd3 = generateSerialization(history3, "A C B D");
+    const bdac3 = generateSerialization(history3, "B D A C");
+
+    // TODO(neil): Put this in the paper as a good example of why we should include reads in
+    // serializations.
+    test("serialization with multiple reads is not pram unless reads follow program order", () => {
+        expect(isPRAM(history3, { 0: ab3, 1: acbd3 })).toEqual({
+            isMonotonicReads: true,
+            isMonotonicWrites: true,
+            isReadYourWrites: true,
+            isClientOrder: true,
+            isPRAM: true,
+        });
+
+        expect(isPRAM(history3, { 0: ab3, 1: bdac3 })).toEqual({
+            isMonotonicReads: true,
+            isMonotonicWrites: false,
+            isReadYourWrites: true,
+            isClientOrder: false,
             isPRAM: false,
         });
     });
@@ -101,19 +136,17 @@ describe("sequential consistency", () => {
     --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
     `);
 
+    const abcd = generateSerialization(history, "A C D");
     const cdab = generateSerialization(history, "C D A B");
 
-    const systemSerialization = { 0: cdab, 1: cdab };
+    const systemSerialization = { 0: abcd, 1: cdab };
 
-    // So this is confusing. systemSerialization is SingleOrder, PRAM, and RVal.
-    //
-    // According to http://jepsen.io/consistency/models/sequential, this means it is sequentially
-    // consistent. This makes sense. However, it is not the case that it is causal. This means
-    // that sequential consistency does not imply causal (and we know that causal is not sequential
-    // but we always knew this).
-
-    expect(isSingleOrder(history, systemSerialization)).toEqual(true);
-    expect(isPRAM(history, systemSerialization)).toHaveProperty("isPRAM", true);
+    expect(isSequential(history, systemSerialization).isSequential).toBe(false);
+    expect(isSingleOrder(history, systemSerialization)).toEqual(false);
+    expect(isPRAM(history, systemSerialization)).toHaveProperty(
+        "isPRAM",
+        false
+    );
     expect(isRval(history, systemSerialization)).toEqual(true);
 
     expect(isWritesFollowReads(history, systemSerialization)).toBe(false);
@@ -232,5 +265,44 @@ describe("linearizability", () => {
         expect(linearizability.isRealTime).toBe(false);
         expect(linearizability.isLinearizable).toBe(false);
         expect(linearizability.sequential.isSequential).toBe(true);
+    });
+});
+
+describe("single order", () => {
+    test("accepts non-PRAM consistent serializations", () => {
+        const history = generateHistoryFromString(`
+        ----[A:x<-1]-[B:x<-2]-------------------------
+        -----------------------[C:x->2]---[D:x->1]----
+        `);
+
+        const s0 = generateSerialization(history, "B A");
+        const s1 = generateSerialization(history, "B C A D");
+
+        expect(isSingleOrder(history, { 0: s0, 1: s1 })).toBe(true);
+    });
+
+    test("works with serializations with only writes", () => {
+        const history = generateHistoryFromString(`
+        ----[A:x<-1]-[B:x<-2]-------[E:x<-9]----------
+        -----------------------[C:x<-3]---[D:x<-4]----
+        `);
+        const s0 = generateSerialization(history, "C A B E D");
+
+        expect(isSingleOrder(history, { 0: s0, 1: s0 })).toBe(true);
+    });
+
+    test("single order ignores all reads", () => {
+        const history = generateHistoryFromString(`
+        ----[A:x<-1]---------------------------------
+        --------------[B:x->1]---[C:x<-2]---[D:x->3]-
+        `);
+
+        // B and D do not matter
+        const s0OutOfOrder = generateSerialization(history, "C A");
+        const s0InOrder = generateSerialization(history, "A C");
+        const s1 = generateSerialization(history, "A B C D");
+
+        expect(isSingleOrder(history, { 0: s0OutOfOrder, 1: s1 })).toBe(false);
+        expect(isSingleOrder(history, { 0: s0InOrder, 1: s1 })).toBe(true);
     });
 });

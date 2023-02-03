@@ -1,5 +1,5 @@
-import {createSignal} from "solid-js";
-import {Operation, OperationType} from "~/backend/types";
+import { createSignal } from "solid-js";
+import { Operation, OperationType } from "~/backend/types";
 import "./OperationView.css";
 
 export default function OperationView(props: OperationsSliderProps) {
@@ -25,7 +25,8 @@ export default function OperationView(props: OperationsSliderProps) {
         const moveResult = props.canMove(e.pageX - leftOffset());
 
         if (!moveResult.allowed) {
-            if (moveResult.suggestedPosition) setDragX(leftOffset() + moveResult.suggestedPosition);
+            if (moveResult.suggestedPosition)
+                setDragX(leftOffset() + moveResult.suggestedPosition);
             return;
         }
         setDragX(e.pageX);
@@ -38,25 +39,32 @@ export default function OperationView(props: OperationsSliderProps) {
         document.body.removeEventListener("mousemove", moveDrag);
 
         // and commit!
-        props.onMoved(dragX() - leftOffset())
+        props.onMoved(dragX() - leftOffset());
     }
     return (
-            <div
-                class={`operation ${props.op.type === OperationType.Read ? "read" : "write"} ${props.draggable ? "draggable" : ""}`}
-                ref={operationDiv}
-                style={{
-                    "--start-time": props.op.startTime,
-                    "--end-time": props.op.endTime,
-                    "transform": dragging() ? `translateX(${dragX() - startX()}px)` : ""
-                }}
-                onmousedown={startDrag}>
-                <span class="name">{props.op.operationName}</span>
-                <div class="info">
-                    <span class="variable">x</span>
-                    <span class="material-symbols-outlined icon">{props.op.type === OperationType.Read ? "east" : "west"}</span>
-                    <span class="value">{props.op.value}</span>
-                </div>
+        <div
+            class={`operation ${
+                props.op.type === OperationType.Read ? "read" : "write"
+            } ${props.draggable ? "draggable" : ""}`}
+            ref={operationDiv}
+            style={{
+                "--start-time": props.op.startTime,
+                "--end-time": props.op.endTime,
+                transform: dragging()
+                    ? `translateX(${dragX() - startX()}px)`
+                    : "",
+            }}
+            onmousedown={startDrag}
+        >
+            <span class="name">{props.op.operationName}</span>
+            <div class="info">
+                <span class="variable">x</span>
+                <span class="material-symbols-outlined icon">
+                    {props.op.type === OperationType.Read ? "east" : "west"}
+                </span>
+                <span class="value">{props.op.value}</span>
             </div>
+        </div>
     );
 }
 
@@ -65,7 +73,7 @@ interface OperationsSliderProps {
 
     draggable?: boolean;
 
-    canMove(px: number): { allowed: boolean, suggestedPosition?: number };
+    canMove(px: number): { allowed: boolean; suggestedPosition?: number };
 
     onMoved(px: number): unknown;
 }
