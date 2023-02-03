@@ -83,11 +83,11 @@ export default function OperationView(props: OperationsSliderProps) {
         >
             <span class="name">{props.op.operationName}</span>
             <div class="info">
-                <span class="variable">x</span>
-                <span class="material-symbols-outlined icon">
-                    {props.op.type === OperationType.Read ? "east" : "west"}
+                <span>
+                    {`${props.op.type === OperationType.Read ? "R" : "W"}(${
+                        props.op.value
+                    })`}
                 </span>
-                <span class="value">{props.op.value}</span>
             </div>
         </div>
     );
