@@ -61,10 +61,7 @@ ${classSpecs.join("\n")}`;
         render();
     })
 
-    return <>
-    <pre style={{"text-align": "start"}}>{JSON.stringify(isLinearizable(props.history, props.systemSerialization), undefined, 4)}</pre>
-    <div ref={containerRef}></div>
-    </>;
+    return <div ref={containerRef}></div>;
 }
 
 interface ResultsTreeProps {
