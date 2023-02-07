@@ -1,17 +1,22 @@
-import {History, Operation, OperationType, SystemSerialization} from "./types";
+import {
+    History,
+    Operation,
+    OperationType,
+    SystemSerialization,
+} from "./types";
 
 /**
-* Takes a string-based representation of an operation history and returns an OperationHistory that
-* logically represents the string.
-*
-* The string-based format must conform to the following format:
-*  - Each operation must be enclosed by pipes
-*  - Two operations are supported: reads (r) and writes (w). To denote writing a value v,
-*    use the syntax |w<-v|. To denote reading a value v, use the syntax |r->v|.
-*  - Between events in the same process, hyphens must be used
-*  - All lines must have the same length
-* @param h the string-based representation of a history
-*/
+ * Takes a string-based representation of an operation history and returns an OperationHistory that
+ * logically represents the string.
+ *
+ * The string-based format must conform to the following format:
+ *  - Each operation must be enclosed by pipes
+ *  - Two operations are supported: reads (r) and writes (w). To denote writing a value v,
+ *    use the syntax |w<-v|. To denote reading a value v, use the syntax |r->v|.
+ *  - Between events in the same process, hyphens must be used
+ *  - All lines must have the same length
+ * @param h the string-based representation of a history
+ */
 export const generateHistoryFromString = (h: string): History => {
     const processes = h
         .trim()
@@ -26,16 +31,16 @@ export const generateHistoryFromString = (h: string): History => {
     processes.forEach((p, i) => {
         if (p.length !== firstLength) {
             throw new Error(
-                    `Line ${i} had length of ${p.length}, expected ${firstLength}`
-                    );
+                `Line ${i} had length of ${p.length}, expected ${firstLength}`
+            );
         }
     });
 
     let history: History = {};
 
     processes.forEach(
-            (line, proc) => (history[proc] = generateSessionProjection(line, proc))
-            );
+        (line, proc) => (history[proc] = generateSessionProjection(line, proc))
+    );
 
     return history;
 };
@@ -45,9 +50,9 @@ export const generateHistoryFromString = (h: string): History => {
 // ---[A:x<-1]-----[C:x<-3]-------[E:x<-5]----------------[G:x<-7]
 // -------------[B:x<-2]-------[D:x<-4]------[F:x<-6]---[H:x<-8]--
 export const generateSessionProjection = (
-        line: string,
-        proc: number
-        ): Operation[] => {
+    line: string,
+    proc: number
+): Operation[] => {
     let operations: Operation[] = [];
 
     const regex = /\[([A-Z]):([a-z])(<-|->)\s*(\d)\]/g;
@@ -84,17 +89,19 @@ export const generateSessionProjection = (
 };
 
 /**
-* Generates an array of Operations using a history and a list of processId names separated by
-* space.
-*/
+ * Generates an array of Operations using a history and a list of processId names separated by
+ * space.
+ */
 export const generateSerialization = (
-        history: History,
-        serialization: string
-        ): Operation[] => {
+    history: History,
+    serialization: string
+): Operation[] => {
     const map: { [key: string]: Operation } = {};
     Object.values(history)
         .flatMap(_ => _)
-        .forEach(operation => (map[operation.operationName] = {...operation}));
+        .forEach(
+            operation => (map[operation.operationName] = { ...operation })
+        );
 
     const operationIds = serialization.split(" ");
     return operationIds.map(operationId => map[operationId]);
@@ -102,8 +109,8 @@ export const generateSerialization = (
 
 export const sortOperations = (ops: History | SystemSerialization) => {
     Object.values(ops).forEach((arr: Operation[]) => {
-        arr.sort((a,b) => a.startTime - b.startTime);
-    })
+        arr.sort((a, b) => a.startTime - b.startTime);
+    });
 
     return ops;
-}
+};

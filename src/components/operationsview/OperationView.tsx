@@ -1,9 +1,9 @@
-import {createSignal} from "solid-js";
-import {Operation, OperationType} from "~/backend/types";
+import { createSignal } from "solid-js";
+import { Operation, OperationType } from "~/backend/types";
 import "./OperationView.css";
 
 interface ICoordinateInfo {
-    pageX: number
+    pageX: number;
 }
 
 export default function OperationView(props: OperationsSliderProps) {
@@ -27,7 +27,9 @@ export default function OperationView(props: OperationsSliderProps) {
         document.body.addEventListener("mouseleave", moveEnd);
         document.body.addEventListener("mousemove", moveDrag);
         document.body.addEventListener("touchend", moveEnd);
-        document.body.addEventListener("touchmove", touchMove, { passive: false });
+        document.body.addEventListener("touchmove", touchMove, {
+            passive: false,
+        });
     }
 
     function moveDrag(e: ICoordinateInfo) {
@@ -35,11 +37,11 @@ export default function OperationView(props: OperationsSliderProps) {
 
         if (!moveResult.allowed && moveResult.suggestedPosition)
             setDragX(leftOffset() + moveResult.suggestedPosition);
-        else
-            setDragX(e.pageX);
+        else setDragX(e.pageX);
 
         if (moveResult.allowed) setLastValidPosition(e.pageX);
-        else if (moveResult.suggestedPosition) setLastValidPosition(leftOffset() + moveResult.suggestedPosition);
+        else if (moveResult.suggestedPosition)
+            setLastValidPosition(leftOffset() + moveResult.suggestedPosition);
         setTransparent(!moveResult.allowed && !moveResult.suggestedPosition);
     }
 
@@ -52,7 +54,7 @@ export default function OperationView(props: OperationsSliderProps) {
         document.body.removeEventListener("touchmove", touchMove);
 
         // and commit!
-        props.onMoved(lastValidPosition() - leftOffset())
+        props.onMoved(lastValidPosition() - leftOffset());
     }
 
     const touchStart = (e: TouchEvent) => startDrag(e.touches[0]);
@@ -62,23 +64,32 @@ export default function OperationView(props: OperationsSliderProps) {
     };
 
     return (
-            <div
-                class={`operation ${props.op.type === OperationType.Read ? "read" : "write"} ${props.draggable ? "draggable" : ""} ${isTransparent() ? "transparent" : ""}`}
-                ref={operationDiv}
-                style={{
-                    "--start-time": props.op.startTime,
-                    "--end-time": props.op.endTime,
-                    "transform": dragging() ? `translateX(${dragX() - startX()}px)` : ""
-                }}
-                onmousedown={startDrag}
-                ontouchstart={touchStart}>
-                <span class="name">{props.op.operationName}</span>
-                <div class="info">
-                    <span class="variable">x</span>
-                    <span class="material-symbols-outlined icon">{props.op.type === OperationType.Read ? "east" : "west"}</span>
-                    <span class="value">{props.op.value}</span>
-                </div>
+        <div
+            class={`operation ${
+                props.op.type === OperationType.Read ? "read" : "write"
+            } ${props.draggable ? "draggable" : ""} ${
+                isTransparent() ? "transparent" : ""
+            }`}
+            ref={operationDiv}
+            style={{
+                "--start-time": props.op.startTime,
+                "--end-time": props.op.endTime,
+                transform: dragging()
+                    ? `translateX(${dragX() - startX()}px)`
+                    : "",
+            }}
+            onmousedown={startDrag}
+            ontouchstart={touchStart}
+        >
+            <span class="name">{props.op.operationName}</span>
+            <div class="info">
+                <span>
+                    {`${props.op.type === OperationType.Read ? "R" : "W"}(${
+                        props.op.value
+                    })`}
+                </span>
             </div>
+        </div>
     );
 }
 
@@ -87,7 +98,7 @@ interface OperationsSliderProps {
 
     draggable?: boolean;
 
-    canMove(px: number): { allowed: boolean, suggestedPosition?: number };
+    canMove(px: number): { allowed: boolean; suggestedPosition?: number };
 
     onMoved(px: number): unknown;
 }

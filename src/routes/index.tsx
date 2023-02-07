@@ -1,35 +1,40 @@
 import { Title } from "solid-start";
 import OperationView from "~/components/operationsview/OperationView";
 import OperationsView from "~/components/operationsview/OperationsView";
-import { generateSerialization, generateHistoryFromString } from "~/backend/util";
-import {ResultsTree} from "~/components/ResultsTree";
-import {createEffect, createSignal} from "solid-js";
+import {
+    generateSerialization,
+    generateHistoryFromString,
+} from "~/backend/util";
+import { ResultsTree } from "~/components/ResultsTree";
+import { createEffect, createSignal } from "solid-js";
 import { SystemSerialization } from "~/backend/types";
 
 export default function Home() {
     const history = generateHistoryFromString(`
-    ----[A:x<-  1]-------------------------------------------[E:x->  2]--
-    ----------------[B:x->  1]---[C:x<-  2]---[D:x<-  3]-----------------
+    ----[A:x<-   1]-[B:x<-   2]-------------------------------
+    -----------------------------[C:x->   2]---[D:x->   1]----
     `);
 
-    const abcd1 = generateSerialization(history, "A B C D E");
-    const abcd2 = generateSerialization(history, "A B C D E");
+    const ab = generateSerialization(history, "A B");
+    const bacd = generateSerialization(history, "B A C D");
 
-    const [serial, setSerial] = createSignal<SystemSerialization>({ 0: abcd1, 1: abcd2 });
+    const [serial, setSerial] = createSignal<SystemSerialization>({
+        0: ab,
+        1: bacd,
+    });
 
     return (
         <main>
             <Title>Consistency Models</Title>
 
-            <OperationsView
-                title="History"
-                operations={history}/>
+            <OperationsView title="History" operations={history} />
 
             <OperationsView
                 title="Serializations"
                 operationsDraggable
                 operations={serial()}
-                onOperationsChanged={s => setSerial(s as SystemSerialization)}/>
+                onOperationsChanged={s => setSerial(s as SystemSerialization)}
+            />
 
             <ResultsTree history={history} systemSerialization={serial()} />
         </main>

@@ -47,9 +47,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-}
 
-.icon {
-    font-size: 18px;
-    margin: 0 4px;
+    font-family: 'Courier New', Courier, monospace;
 }
