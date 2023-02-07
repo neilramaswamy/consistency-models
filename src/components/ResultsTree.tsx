@@ -4,9 +4,6 @@ import {isLinearizable} from "~/backend/predicates";
 import mermaid from "mermaid";
 
 // todo: put this somewhere better
-const fillColor = "green";
-const textColor = "black";
-
 const chartDefBase = `
 graph TD
     A --> C(Realtime)
@@ -21,8 +18,8 @@ graph TD
     G --> K(Read Your Writes)
     G --> L(Client Order)
 
-classDef yay fill:#33691e;
-classDef no fill:red;
+classDef yay fill:#33691e,color:white
+classDef no fill:#b71c1c,color:white
 `.trim();
 
 function getClassSpec(name: string, predicate: boolean) {
@@ -30,36 +27,13 @@ function getClassSpec(name: string, predicate: boolean) {
 }
 
 export function ResultsTree(props: ResultsTreeProps) {
-    let canvasRef: HTMLCanvasElement | undefined;
-    const [result, setResult] = createSignal();
+    let containerRef: HTMLDivElement | undefined;
+    const [svg, setSvg] = createSignal();
 
-    function render() {
-       // if (!canvasRef) return;
-//        const result = isLinearizable(props.history, props.systemSerialization);
-
-//        console.log(result);
-//        const ctx = canvasRef.getContext('2d');
-//
-//        // clear
-//        ctx.fillStyle = fillColor;
-//        ctx.fillRect(0, 0, 500, 500);
-//        ctx.fillStyle = textColor;
-//        ctx.font = "12px Arial"
-//        ctx.fillText(JSON.stringify(result, undefined, 4), 10, 50);
+    async function render() {
+        if (!containerRef) return;
         const result = isLinearizable(props.history, props.systemSerialization);
-/*
-A(Linearizable)
-    B(Sequential)
-    C(Realtime)
-D(Causal)
-     E(RVal)
-   F(Single Order)
-    G(PRAM)
-    D --> H(Writes Follow Reads)
-    G --> I(Monotonic Reads)
-    G --> J(Monotonic Writes)
-    G --> K(Read Your Writes)
-    G --> L(Client Order)*/
+
         const classSpecs = [
             getClassSpec("A", result.isLinearizable),
             getClassSpec("B", result.sequential.isSequential),
@@ -72,20 +46,25 @@ D(Causal)
             getClassSpec("I", result.sequential.causal.pram.isMonotonicReads),
             getClassSpec("J", result.sequential.causal.pram.isMonotonicWrites),
             getClassSpec("K", result.sequential.causal.pram.isReadYourWrites),
-            getClassSpec("L", result.sequential.causal.pram.isClientOrder),
-            ];
+            getClassSpec("L", result.sequential.causal.pram.isClientOrder),];
 
         const chart = `${chartDefBase}
 
-${}`
+${classSpecs.join("\n")}`;
+
+        const svg = await mermaid.mermaidAPI.renderAsync("asdf", chart);
+        //setSvg(svg);
+        containerRef.innerHTML = svg;
     }
 
     createEffect(() => {
         render();
     })
 
-   // return <canvas width={500} height={500} ref={canvasRef}/>
-    return <pre style={{"text-align": "start"}}>{JSON.stringify(isLinearizable(props.history, props.systemSerialization), undefined, 4)}</pre>
+    return <>
+    <pre style={{"text-align": "start"}}>{JSON.stringify(isLinearizable(props.history, props.systemSerialization), undefined, 4)}</pre>
+    <div ref={containerRef}></div>
+    </>;
 }
 
 interface ResultsTreeProps {
