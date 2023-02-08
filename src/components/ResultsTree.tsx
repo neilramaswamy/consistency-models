@@ -1,7 +1,8 @@
-import {History, SystemSerialization} from "~/backend/types";
-import {createEffect, createSignal} from "solid-js";
-import {isLinearizable} from "~/backend/predicates";
+import { History, SystemSerialization } from "~/backend/types";
+import { createEffect, createSignal } from "solid-js";
+import { isLinearizable } from "~/backend/predicates";
 import mermaid from "mermaid";
+import "./ResultsTree";
 
 // todo: put this somewhere better
 const chartDefBase = `
@@ -46,7 +47,8 @@ export function ResultsTree(props: ResultsTreeProps) {
             getClassSpec("I", result.sequential.causal.pram.isMonotonicReads),
             getClassSpec("J", result.sequential.causal.pram.isMonotonicWrites),
             getClassSpec("K", result.sequential.causal.pram.isReadYourWrites),
-            getClassSpec("L", result.sequential.causal.pram.isClientOrder),];
+            getClassSpec("L", result.sequential.causal.pram.isClientOrder),
+        ];
 
         const chart = `${chartDefBase}
 
@@ -59,13 +61,13 @@ ${classSpecs.join("\n")}`;
 
     createEffect(() => {
         render();
-    })
+    });
 
-    return <div ref={containerRef}></div>;
+    return <div class="foo" ref={containerRef}></div>;
 }
 
 interface ResultsTreeProps {
-    history: History
+    history: History;
 
-    systemSerialization: SystemSerialization
+    systemSerialization: SystemSerialization;
 }
