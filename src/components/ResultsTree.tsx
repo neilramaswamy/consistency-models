@@ -63,7 +63,7 @@ ${classSpecs.join("\n")}`;
         render();
     });
 
-    return <div class="foo" ref={containerRef}></div>;
+    return <div class="results-tree" ref={containerRef}></div>;
 }
 
 interface ResultsTreeProps {
