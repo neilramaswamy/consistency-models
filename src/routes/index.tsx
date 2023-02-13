@@ -12,7 +12,7 @@ import { SystemSerialization } from "~/backend/types";
 export default function Home() {
     const history = generateHistoryFromString(`
     ----[A:x<-   1]-[B:x<-   2]-------------------------------
-    -----------------------------[C:x->   1]---[D:x->   2]----
+    -----------------------------[C:x->   2]---[D:x->   1]----
     `);
 
     const ab = generateSerialization(history, "A B");
