@@ -86,15 +86,18 @@ The constraints are as follow:
 
 The formal definition of a serialization is now ready to be written out:
 
-(TODO: the work below is a scratchpad)
+$$
+\forall i \in [0, n), \forall h \in H, \exists s \in S_i \space s.t. \\
 
-TODO: _for all operations in the history, in the serialization to which the operation belongs, its start/end time must not be modified_
+    (h.proc = i \implies h = s) \wedge \\
+    ((h.proc \neq i \wedge h.op = wr) \implies \epsilon(h, s))
+$$
+
+Here, $\epsilon$ is defined to be time-independent equality. Two operations are equal under $\epsilon$ if all their properties are the same, regardless of their start time ($stime$) and end time ($etime$). The one well-formedness constraint over a serialization $S_i$ is the non-overlapping property:
 
 $$
 \forall a \in S_i, \space \nexists b \in S_i  \space | \space (a.stime <= b.etime) \wedge (b.stime <= a.etime)
 $$
-
-(Note: that last predicate just tells us [whether two events overlap](https://stackoverflow.com/questions/325933/determine-whether-two-date-ranges-overlap).)
 
 ### Abstract Executions
 
