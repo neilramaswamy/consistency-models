@@ -77,23 +77,29 @@ In this tool, we use serializations to explore consistency models. The histories
 Now, we sketch a definition for a serialization, and later formalize it. Here's the intuition:
 
 -   A serialization $i$ has all the operations from client $i$, as well as all the writes from the history
--   All properties of the operation remain the same except for the start and end times, which are subject to some constraints below
+-   All properties of the operations remain the same except for the start and end times, which are subject to some well-formedness constraints below
 
 The constraints are as follow:
 
-1. we say that for serialization $i$, the operations issued by client $i$ are not modified at all, i.e. all their properties remain the same.
-2. the writes coming from the other clients might move around, but they must not overlap with each other, since serializations are sequential.
+1. the writes coming from the other clients might move around, but they must not overlap with each other, since serializations are sequential. This is called the "non-overlapping property".
+2. No operation can appear in a serialization earlier than it appears in the history. This is called the "no backwards movement property":
 
 The formal definition of a serialization is now ready to be written out:
 
 $$
 \forall i \in [0, n), \forall h \in H, \exists s \in S_i \space s.t. \\
 
-    (h.proc = i \implies h = s) \wedge \\
-    ((h.proc \neq i \wedge h.op = wr) \implies \epsilon(h, s))
+    (h.proc = i \implies \text{Eq}(h, s)) \wedge \\
+    (h.proc \neq i \wedge h.op = wr) \implies \text{TimelessEq}(h, s) \wedge \text{FowardsMotion}(h, s)
 $$
 
-Here, $\epsilon$ is defined to be time-independent equality. Two operations are equal under $\epsilon$ if all their properties are the same, regardless of their start time ($stime$) and end time ($etime$). The one well-formedness constraint over a serialization $S_i$ is the non-overlapping property:
+The sub-predicates used are explained below:
+
+-   `Eq(a, b)` says that the two operations have exactly the same properties
+-   `Timeless(a, b)` says whether two operations, ignoring their start and end times, have the same properties
+-   `ForwardMotion(a, b)` says that `b.stime > a.time`, meaning that `b` must move foward relative to `a`.
+
+There is one final well-formedness predicate that we need: the non-overlapping property:
 
 $$
 \forall a \in S_i, \space \nexists b \in S_i  \space | \space (a.stime <= b.etime) \wedge (b.stime <= a.etime)

@@ -11,16 +11,18 @@ import { SystemSerialization } from "~/backend/types";
 
 export default function Home() {
     const history = generateHistoryFromString(`
-    ----[A:x<-   1]-[B:x<-   2]-------------------------------
-    -----------------------------[C:x->   2]---[D:x->   1]----
+    ----[A:x<-1]---------------------------------
+    --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
     `);
 
-    const ab = generateSerialization(history, "A B");
-    const abcd = generateSerialization(history, "A B C D");
+    const cda = generateSerialization(history, "C D A");
+    const cdab = generateSerialization(history, "C D A B");
+
+    console.log(cdab);
 
     const [serial, setSerial] = createSignal<SystemSerialization>({
-        0: ab,
-        1: abcd,
+        0: cda,
+        1: cdab,
     });
 
     return (
