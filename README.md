@@ -70,9 +70,45 @@ $$
 
 The issue with abstract executions is that, because they're relations, they're not easily visualizable. We can't just look at a timeline diagram of a history and understand how the uncertainties of the underlying distributed system manifested: to do that, we'd also need to include the abstract executions.
 
-### Serializations as Replacement for Abstract Executions
+### Formalizing a Serialization
 
-In this tool, we use a combination of histories and serializations to explore consistency models. The histories tell us what the clients observed, and the serializations tell us _why_ they observed what they did. In effect, the serializations take the place of abstract executions. This, of course, has been done before (Viotti and Vucolic have a few serialization diagrams in their work), but the hypothesis is that we should present consistency models using histories/serializations, since they're easier to communicate.
+In this tool, we use serializations to explore consistency models. The histories tell us what the clients observed, and the serializations tell us _why_ they observed what they did. In effect, the serializations help us visually express abstract executions in the form of timeline diagrams. This, of course, has been done before: The Art of Multiprocessor Programming (Herlihy, Shavit) use serialiations to teach consistency models, but just a few of the most important ones. Viotti and Vucolic's work have dozens of consistency models, but they don't formally define what a serialization is. Here, we do that.
+
+Now, we sketch a definition for a serialization, and later formalize it. Here's the intuition:
+
+-   A serialization $i$ has all the operations from client $i$, as well as all the writes from the history
+-   All properties of the operation remain the same except for the start and end times, which are subject to some constraints below
+
+The constraints are as follow:
+
+1. we say that for serialization $i$, the operations issued by client $i$ are not modified at all, i.e. all their properties remain the same.
+2. the writes coming from the other clients might move around, but they must not overlap with each other, since serializations are sequential.
+
+The formal definition of a serialization is now ready to be written out:
+
+(TODO: the work below is a scratchpad)
+
+TODO: _for all operations in the history, in the serialization to which the operation belongs, its start/end time must not be modified_
+
+$$
+\forall a \in S_i, \space \nexists b \in S_i  \space | \space (a.stime <= b.etime) \wedge (b.stime <= a.etime)
+$$
+
+(Note: that last predicate just tells us [whether two events overlap](https://stackoverflow.com/questions/325933/determine-whether-two-date-ranges-overlap).)
+
+### Abstract Executions
+
+Our end goal is to capture the abstract executions within serializations, so let's do that now.
+
+First, we tackle the _vis_ relation for some operations $a$ and $b$ where $a \xrightarrow{vis} b$:
+
+-   If $a$ and $b$ are both writes, then in all serializations, $a.stime < b.stime$
+-   If $a$ is a write and $b$, then in serialization ${b.proc}$, $a.stime < b.stime$.
+-   If $a$ is a read, then it's not visible to anything in the future, so we don't need to anything in these cases.
+
+Next, we tackle the _ar_ relation for some operations $a$ and $b$ where $a \xrightarrow{ar} b$. Since _ar_ specifies a total ordering on writes as defined by the conflict resolution strategy, we can simply say that for all serializations, $a.stime < b.stime$.
+
+(TODO: this might not be entirely correct... it's possible that $a \xrightarrow{ar} b$ does not imply this order in every single serialization, since the conflict-resolution logic would do correct resolution, even if the writes aren't in the arbitration order.)
 
 ## Current Work
 
