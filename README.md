@@ -98,10 +98,16 @@ The sub-predicates used are explained below:
 -   `UntimedEq(a, b)` says whether two operations, ignoring their start and end times, have the same properties
 -   `ForwardMotion(a, b)` says that `b.stime > a.etime`, meaning that `b` must move foward relative to `a`.
 
-There is one final well-formedness predicate that we need: the non-overlapping property:
+There are two final well-formedness predicate that we need. First, the non-overlapping property:
 
 $$
 \forall a \in S_i, \space \nexists b \in S_i  \space | \space (a.stime <= b.etime) \wedge (b.stime <= a.etime)
+$$
+
+And second, we just have to make sure that serializations don't have any _more_ elements than what we want:
+
+$$
+\#S_i = \# \{ H|_{wr} \cup \{op \in H : op.proc = i \} \}
 $$
 
 ### Abstract Executions
