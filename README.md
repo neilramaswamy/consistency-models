@@ -90,14 +90,14 @@ $$
 \forall i \in [0, n), \forall h \in H, \exists s \in S_i \space s.t. \\
 
     (h.proc = i \implies \text{Eq}(h, s)) \wedge \\
-    (h.proc \neq i \wedge h.op = wr) \implies \text{TimelessEq}(h, s) \wedge \text{FowardsMotion}(h, s)
+    (h.proc \neq i \wedge h.op = wr) \implies \text{UntimedEq}(h, s) \wedge \text{FowardsMotion}(h, s)
 $$
 
 The sub-predicates used are explained below:
 
 -   `Eq(a, b)` says that the two operations have exactly the same properties
--   `Timeless(a, b)` says whether two operations, ignoring their start and end times, have the same properties
--   `ForwardMotion(a, b)` says that `b.stime > a.time`, meaning that `b` must move foward relative to `a`.
+-   `UntimedEq(a, b)` says whether two operations, ignoring their start and end times, have the same properties
+-   `ForwardMotion(a, b)` says that `b.stime > a.etime`, meaning that `b` must move foward relative to `a`.
 
 There is one final well-formedness predicate that we need: the non-overlapping property:
 
