@@ -87,9 +87,9 @@ The constraints are as follow:
 The formal definition of a serialization is now ready to be written out:
 
 $$
-\forall i \in [0, n), \forall h \in H, \exists s \in S_i \space s.t. \\
+\forall i \in [0, n), \forall h \in H, \exists s \in S_i \space s.t.
 
-    (h.proc = i \implies \text{Eq}(h, s)) \wedge \\
+    (h.proc = i \implies \text{Eq}(h, s)) \wedge
     (h.proc \neq i \wedge h.op = wr) \implies \text{UntimedEq}(h, s) \wedge \text{FowardsMotion}(h, s)
 $$
 
