@@ -1,4 +1,5 @@
 import { Title } from "solid-start";
+import "solid-devtools";
 import OperationView from "~/components/operationsview/OperationView";
 import OperationsView from "~/components/operationsview/OperationsView";
 import {
@@ -11,14 +12,17 @@ import { SystemSerialization } from "~/backend/types";
 
 export default function Home() {
     const history = generateHistoryFromString(`
-    ----[A:x<-1]---------------------------------
-    --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
+    ----[A:x<-  1]-------------------------------------
+    --------------[B:x->  1]---[C:x<-  2]---[D:x<-  3]-
     `);
 
-    const cda = generateSerialization(history, "C D A");
-    const cdab = generateSerialization(history, "C D A B");
+    const cda = generateHistoryFromString(`
+    ----[C:x<-  2]-------------[D:x<-  3]---[A:x<-  1]---
+    `)[0];
 
-    console.log(cdab);
+    const cdab = generateHistoryFromString(`
+    ----[C:x<-  2]--[D:x<-  3]---[A:x<-  1]---[B:x->  1]-
+    `)[0];
 
     const [serial, setSerial] = createSignal<SystemSerialization>({
         0: cda,
