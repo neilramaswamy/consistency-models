@@ -76,9 +76,10 @@ export default function OperationsSlider(props: OperationsSliderProps) {
             {props.operations.map(o => {
                 return (
                     <OperationView
+                        type={props.type}
                         op={o}
                         canMove={px => canMove(px, o)}
-                        draggable={props.operationsDraggable}
+                        draggable={!o.isOriginal}
                         onMoved={px =>
                             props.onOperationMoved(o, pxToTrackUnits(px))
                         }
@@ -91,9 +92,8 @@ export default function OperationsSlider(props: OperationsSliderProps) {
 }
 
 interface OperationsSliderProps {
+    type: "History" | "Serializations";
+
     operations: Operation[];
-
-    operationsDraggable?: boolean;
-
     onOperationMoved(op: Operation, start: number): unknown;
 }

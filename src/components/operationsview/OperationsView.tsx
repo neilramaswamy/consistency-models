@@ -12,16 +12,18 @@ export default function OperationsView(props: OperationViewProps) {
         props.onOperationsChanged(sortOperations({ ...props.operations }));
     }
 
+    const title = props.type === "History" ? "History" : "Serializations";
+
     return (
         <div class="ops-view">
-            <h2 class="view-title">{props.title}</h2>
+            <h2 class="view-title">{title}</h2>
             {Object.entries(props.operations).map(([procId, ops]) => (
                 <div class="op-slider-container">
                     <span class="op-slider-title">Client {procId}</span>
                     <OperationsSlider
+                        type={props.type}
                         operations={ops}
                         onOperationMoved={operationMoved}
-                        operationsDraggable={props.operationsDraggable}
                     />
                 </div>
             ))}
@@ -30,11 +32,9 @@ export default function OperationsView(props: OperationViewProps) {
 }
 
 interface OperationViewProps {
-    title: string;
+    type: "History" | "Serializations";
 
     operations: SystemSerialization | History;
 
     onOperationsChanged?: (ops: SystemSerialization | History) => unknown;
-
-    operationsDraggable?: boolean;
 }

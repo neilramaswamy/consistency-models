@@ -5,6 +5,28 @@ import {
     SystemSerialization,
 } from "./types";
 
+const extractLinesFromStringTimeline = (s: string): string[] => {
+    const processes = s
+        .trim()
+        .split("\n")
+        .map(p => p.trim());
+    if (processes.length === 0) {
+        return [];
+    }
+
+    // Make sure that all processes are the same length
+    const firstLength = processes[0].length;
+    processes.forEach((p, i) => {
+        if (p.length !== firstLength) {
+            throw new Error(
+                `Line ${i} had length of ${p.length}, expected ${firstLength}`
+            );
+        }
+    });
+
+    return processes;
+};
+
 /**
  * Takes a string-based representation of an operation history and returns an OperationHistory that
  * logically represents the string.
@@ -18,42 +40,62 @@ import {
  * @param h the string-based representation of a history
  */
 export const generateHistoryFromString = (h: string): History => {
-    const processes = h
-        .trim()
-        .split("\n")
-        .map(p => p.trim());
-    if (processes.length === 0) {
-        return {};
-    }
-
-    // Make sure that all processes are the same length
-    const firstLength = processes[0].length;
-    processes.forEach((p, i) => {
-        if (p.length !== firstLength) {
-            throw new Error(
-                `Line ${i} had length of ${p.length}, expected ${firstLength}`
-            );
-        }
-    });
+    const processes = extractLinesFromStringTimeline(h);
 
     let history: History = {};
-
-    processes.forEach(
-        (line, proc) => (history[proc] = generateSessionProjection(line, proc))
-    );
+    processes.forEach((line, proc) => {
+        const operations: Operation[] = generateSessionProjection(line).map(
+            // Add the isOriginal property here, since we know that all operations in a history
+            // are original, i.e. not a result of message passing
+            op => ({ ...op, isOriginal: true })
+        );
+        history[proc] = operations;
+    });
 
     return history;
 };
 
-// No need to user an actual parser since this is fairly simple
+export const generateSerializationFromString = (
+    history: History,
+    s: string
+): SystemSerialization => {
+    const serializations = extractLinesFromStringTimeline(s);
+
+    let systemSerialization: SystemSerialization = {};
+    serializations.forEach((line, proc) => {
+        const currProcHistory = history[proc];
+
+        const operations: Operation[] = generateSessionProjection(line).map(
+            op => {
+                // If this operation exists in the current process history, then its original.
+                const originalOp = currProcHistory.find(
+                    historyOp => historyOp.operationName == op.operationName
+                );
+
+                if (originalOp) {
+                    return originalOp;
+                } else {
+                    return { ...op, isOriginal: false };
+                }
+            }
+        );
+
+        systemSerialization[proc] = operations;
+    });
+
+    return systemSerialization;
+};
+
+// Parses something like the following:
 //
 // ---[A:x<-1]-----[C:x<-3]-------[E:x<-5]----------------[G:x<-7]
-// -------------[B:x<-2]-------[D:x<-4]------[F:x<-6]---[H:x<-8]--
+//
+// into a list of operations. The operations don't have the isOriginal property, since that can't
+// be inferred using just the given string.
 export const generateSessionProjection = (
-    line: string,
-    proc: number
-): Operation[] => {
-    let operations: Operation[] = [];
+    line: string
+): Omit<Operation, "isOriginal">[] => {
+    let operations: Omit<Operation, "isOriginal">[] = [];
 
     const regex = /\[([A-Z]):([a-z])(<-|->)\s*(\d)\]/g;
     const matches = line.matchAll(regex);

@@ -16,16 +16,20 @@ export interface Operation {
     // Value being written, or value being read
     value: number;
 
+    // True if this operation was issued directly by a client.
+    // False if this operation is one created as a result of message passing.
+    isOriginal: boolean;
+
     startTime: number;
     endTime: number;
 }
 
 export interface History {
-    [processId: string]: Operation[];
+    [processId: number]: Operation[];
 }
 
 export type Serialization = Operation[];
 
 export interface SystemSerialization {
-    [processId: string]: Serialization;
+    [processId: number]: Serialization;
 }

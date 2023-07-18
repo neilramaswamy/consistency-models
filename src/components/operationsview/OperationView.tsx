@@ -66,10 +66,12 @@ export default function OperationView(props: OperationsSliderProps) {
     return (
         <div
             class={`operation ${
-                props.op.type === OperationType.Read ? "read" : "write"
-            } ${props.draggable ? "draggable" : ""} ${
-                isTransparent() ? "transparent" : ""
-            }`}
+                props.type == "Serializations" &&
+                !props.draggable &&
+                "stationary"
+            } ${props.op.type === OperationType.Read ? "read" : "write"} ${
+                props.draggable ? "draggable" : ""
+            } ${isTransparent() ? "transparent" : ""}`}
             ref={operationDiv}
             style={{
                 "--start-time": props.op.startTime,
@@ -94,8 +96,12 @@ export default function OperationView(props: OperationsSliderProps) {
 }
 
 interface OperationsSliderProps {
+    // Whether the operation is for a history or a serialization
+    type: "History" | "Serializations";
+
     op: Operation;
 
+    // An operation is draggable if it's a non-original operation
     draggable?: boolean;
 
     canMove(px: number): { allowed: boolean; suggestedPosition?: number };
