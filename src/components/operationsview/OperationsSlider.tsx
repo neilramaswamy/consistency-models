@@ -1,6 +1,6 @@
-import { createSignal } from "solid-js";
+import { createSignal, createEffect, onMount } from "solid-js";
 import "./OperationsSlider.css";
-import { Operation } from "~/backend/types";
+import { Operation, History, OriginalOperationsByName } from "~/backend/types";
 import OperationView from "~/components/operationsview/OperationView";
 
 export default function OperationsSlider(props: OperationsSliderProps) {
@@ -11,6 +11,7 @@ export default function OperationsSlider(props: OperationsSliderProps) {
         op: Operation,
         suggest: boolean = true
     ): { allowed: boolean; suggestedPosition?: number } {
+        if (props.type === "History") return { allowed: false };
         if (!px) return { allowed: false };
 
         // can we move here?
@@ -18,13 +19,20 @@ export default function OperationsSlider(props: OperationsSliderProps) {
         const operationWidth = op.endTime - op.startTime;
         const operationEnd = operationLeft + operationWidth;
 
-        const intersections = [];
-
         function trySuggest(num: number) {
             if (!suggest) return undefined;
 
             const px = trackUnitsToPx(num);
             return canMove(px, op, false).allowed ? px : undefined;
+        }
+
+        // Can't move it left of the original operation of the same name
+        const originalOp = props.originalOperations[op.operationName];
+        if (operationLeft < originalOp.startTime) {
+            return {
+                allowed: false,
+                suggestedPosition: trySuggest(originalOp.startTime),
+            };
         }
 
         if (operationLeft < 0)
@@ -80,9 +88,11 @@ export default function OperationsSlider(props: OperationsSliderProps) {
                         op={o}
                         canMove={px => canMove(px, o)}
                         draggable={!o.isOriginal}
-                        onMoved={px =>
-                            props.onOperationMoved(o, pxToTrackUnits(px))
-                        }
+                        onMoved={px => {
+                            if (props.type === "Serializations") {
+                                props.onOperationMoved(o, pxToTrackUnits(px));
+                            }
+                        }}
                     />
                 );
             })}
@@ -91,9 +101,31 @@ export default function OperationsSlider(props: OperationsSliderProps) {
     );
 }
 
-interface OperationsSliderProps {
-    type: "History" | "Serializations";
+type OperationsSliderProps =
+    | OperationSliderHistoryProps
+    | OperationSliderSerializationProps;
+
+interface OperationSliderHistoryProps {
+    type: "History";
+    operations: Operation[];
+}
+
+interface OperationSliderSerializationProps {
+    type: "Serializations";
 
     operations: Operation[];
     onOperationMoved(op: Operation, start: number): unknown;
+
+    // So that we can know the left-bound of any non-original operation
+    originalOperations: OriginalOperationsByName;
 }
+
+/*
+
+
+
+
+
+
+
+*/

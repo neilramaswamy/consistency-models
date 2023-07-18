@@ -24,6 +24,8 @@ export interface Operation {
     endTime: number;
 }
 
+export type OriginalOperationsByName = { [key: string]: Operation };
+
 export interface History {
     [processId: number]: Operation[];
 }

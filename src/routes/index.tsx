@@ -32,10 +32,15 @@ export default function Home() {
         <main>
             <Title>Consistency Models</Title>
 
-            <OperationsView type="History" operations={history} />
+            <OperationsView
+                type="History"
+                history={history}
+                operations={history}
+            />
 
             <OperationsView
                 type="Serializations"
+                history={history}
                 operations={serial()}
                 onOperationsChanged={s => setSerial(s as SystemSerialization)}
             />
