@@ -116,17 +116,21 @@ Our end goal is to capture the abstract executions within serializations, so let
 
 First, we tackle the _vis_ relation for some operations $a$ and $b$ where $a \xrightarrow{vis} b$:
 
--   If $a$ and $b$ are both writes, then in all serializations, $a.stime < b.stime$
--   If $a$ is a write and $b$, then in serialization ${b.proc}$, $a.stime < b.stime$.
+-   If $a$ and $b$ are both writes, then in all serializations, $a.etime < b.stime$
+-   If $a$ is a write and $b$ is a read, then in serialization ${b.proc}$, $a.etime < b.stime$.
 -   If $a$ is a read, then it's not visible to anything in the future, so we don't need to anything in these cases.
 
 Next, we tackle the _ar_ relation for some operations $a$ and $b$ where $a \xrightarrow{ar} b$. Since _ar_ specifies a total ordering on writes as defined by the conflict resolution strategy, we can simply say that for all serializations, $a.stime < b.stime$.
 
 (TODO: this might not be entirely correct... it's possible that $a \xrightarrow{ar} b$ does not imply this order in every single serialization, since the conflict-resolution logic would do correct resolution, even if the writes aren't in the arbitration order.)
 
-## Current Work
+## Outstanding Functional Improvements
 
--   Provide a guided tour through all the consistency models, so that we explain the idea of histories and serializations
+To make the UI reflect the previous discussion, here are the improvements that we should make:
+
+-   For $S_i$, all operations in the history belonging to process $i$ should not be anchored in place. This is to say, all of the _original_ operations should stay in place, and the operations that show up as a result of message passing should be the only ones that are moveable.
+-   Well-formedness predicates should not be expressed within the predicate tree: the UI should prevent any non well-formed serialiations from being rendered. If you try to move a messaging passing operation to the left of its "original" operation, the UI shouldn't let you do that (maybe a red line should appear).
+-   Message passing operations should appear moveable in the serialization, and the original ones should appear as fixed (maybe lower opacity?)
+-   Add explainability to the predicate checker
+-   Unit tests to GitHub actions
 -   Create a "model M but not model N" matrix of consistency models for quick reference
--   Add the ability for the consistency-model checker to explain why something satisfies/fails to satisfy a particular model
--   Hook up our unit tests to GitHub actions
