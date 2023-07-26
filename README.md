@@ -122,6 +122,22 @@ First, we tackle the _vis_ relation for some operations $a$ and $b$ where $a \xr
 
 Next, we tackle the _ar_ relation for some operations $a$ and $b$ where $a \xrightarrow{ar} b$. Since _ar_ specifies a total ordering on writes as defined by the conflict resolution strategy, we can simply say that for all serializations, $a.stime < b.stime$.
 
+## Animation Requirements
+
+-   Sliding: we should be able to smoothly transition an element from one location to another (as the crow flies), where a location can be a new start/end time, or another operation itself
+
+-   Individual element fade-ins and fade-outs: we should be able to fade-in an individual operation on a particular history/serialization
+
+-   Slide: we should be able to slide an element from one position to another
+
+-   Fade-outs: we should be able to fade out an entire history/serialization pair, and then fade-in another history/serialization
+
+-   Control over what text is rendered: each "slide" of the tutorial can have description text.
+
+-   These animations should be chainable: with one user input, we should be able to trigger a series of animations. The Google Slides options probably work for us: On Click, With Previous, After Previous.
+
+-   Animations should be reversable so that readers can replay confusing concepts
+
 ## Outstanding Functional Improvements
 
 To make the UI reflect the previous discussion, here are the improvements that we should make:
