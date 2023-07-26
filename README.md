@@ -122,8 +122,6 @@ First, we tackle the _vis_ relation for some operations $a$ and $b$ where $a \xr
 
 Next, we tackle the _ar_ relation for some operations $a$ and $b$ where $a \xrightarrow{ar} b$. Since _ar_ specifies a total ordering on writes as defined by the conflict resolution strategy, we can simply say that for all serializations, $a.stime < b.stime$.
 
-(TODO: this might not be entirely correct... it's possible that $a \xrightarrow{ar} b$ does not imply this order in every single serialization, since the conflict-resolution logic would do correct resolution, even if the writes aren't in the arbitration order.)
-
 ## Outstanding Functional Improvements
 
 To make the UI reflect the previous discussion, here are the improvements that we should make:
