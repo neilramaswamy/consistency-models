@@ -37,12 +37,6 @@ In recent surveys of formal consistency models [Burkhardt, VV], consistency mode
 -   The set of operations issued by all clients is called a history
 -   A consistency model _constrains_ what histories are allowed
 
-To make that last point a bit visual, here's what we're talking about:
-
-![A large circle representing all histories, and a smaller circle inside of it representing linearizable histories](./img/constraint.png)
-
-The set of all possible histories is very big, but not all of these histories are what we want clients in a distributed setting to observe. In the previous figure, for example, it doesn't make sense to write 3 and read back 4, or read 3 before we ever write it (which is why they're marked in red). However, the linearizability consistenty model _specifies a subset_ (i.e. constrains) the set of histories it allows, thus giving us the very reasonable write 3 and read back 3 behavior.
-
 ### Existing Consistency Models
 
 Histories and constraints on histories don't tell us the entire story, though. They don't explain _why_ a particular history ended up the way that it did. Take the following example, with two clients:
@@ -107,7 +101,7 @@ $$
 And second, we just have to make sure that serializations don't have any _more_ elements than what we want:
 
 $$
-\#S_i = \# \{ H|_{wr} \cup \{op \in H : op.proc = i \} \}
+\\#S_i = \\# \{ H|_{wr} \cup \{op \in H : op.proc = i \} \}
 $$
 
 ### Abstract Executions
