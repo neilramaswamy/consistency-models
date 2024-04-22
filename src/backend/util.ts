@@ -1,8 +1,6 @@
-import { newOpId } from "./opId";
 import {
-    AnyOperation,
-    BaseOperation,
     History,
+    Operation,
     OperationType,
     SystemSerialization,
 } from "./types";
@@ -42,12 +40,15 @@ const extractLinesFromStringTimeline = (s: string): string[] => {
  * @param h the string-based representation of a history
  */
 export const generateHistoryFromString = (h: string): History => {
-    const processes = extractLinesFromStringTimeline(h);
+    const clientHistories = extractLinesFromStringTimeline(h);
 
     let history: History = {};
-    processes.forEach((line, proc) => {
-        const operations: BaseOperation[] = generateSingleClientHistory(line);
-        history[proc] = operations;
+    clientHistories.forEach((clientHistory, clientId) => {
+        const operations: Operation[] = generateSingleClientHistory(
+            clientId,
+            clientHistory
+        );
+        history[clientId] = operations;
     });
 
     return history;
@@ -57,28 +58,29 @@ export const generateSerializationFromString = (
     history: History,
     s: string
 ): SystemSerialization => {
-    const serializations = extractLinesFromStringTimeline(s);
+    const clientSerializations = extractLinesFromStringTimeline(s);
 
     let systemSerialization: SystemSerialization = {};
-    serializations.forEach((line, proc) => {
-        const currProcHistory = history[proc];
+    clientSerializations.forEach((clientSerialization, clientId) => {
+        const currClientHistory = history[clientId];
 
-        const operations: AnyOperation[] = generateSingleClientHistory(
-            line
+        const operations: Operation[] = generateSingleClientHistory(
+            clientId,
+            clientSerialization
         ).map(op => {
             // If this operation exists in the current process history, then its original.
-            const originalOp = currProcHistory.find(
+            const originalOp = currClientHistory.find(
                 historyOp => historyOp.operationName == op.operationName
             );
 
             if (originalOp) {
                 return originalOp;
             } else {
-                return { ...op };
+                return { ...op, type: OperationType.Visiility };
             }
         });
 
-        systemSerialization[proc] = operations;
+        systemSerialization[clientId] = operations;
     });
 
     return systemSerialization;
@@ -90,24 +92,21 @@ export const generateSerializationFromString = (
 //
 // into a list of operations. The operations don't have the isOriginal property, since that can't
 // be inferred using just the given string.
-export const generateSingleClientHistory = (line: string): BaseOperation[] => {
-    let operations: BaseOperation[] = [];
+export const generateSingleClientHistory = (
+    clientId: number,
+    line: string
+): Operation[] => {
+    let operations: Operation[] = [];
 
     const regex = /\[([A-Z]):([a-z])(<-|->)\s*(\d)\]/g;
     const matches = line.matchAll(regex);
 
     for (const match of matches) {
         const operationName = match[1];
-        // const obj = match[2];
         const arrow = match[3];
         const value = parseInt(match[4], 10);
-        // assert(
-        //     match.index !== undefined,
-        //     `Match index was undefined for ${match}`
-        // )
 
         const type = arrow === "->" ? OperationType.Read : OperationType.Write;
-        const operationId = newOpId();
 
         const startTime = match.index || 0;
         // Subtract one since the end time is inclusive and then just add a bit
@@ -115,9 +114,9 @@ export const generateSingleClientHistory = (line: string): BaseOperation[] => {
 
         operations.push({
             type,
-            operationId,
-            forHistory: true,
 
+            isHistory: true,
+            clientId,
             operationName,
             value,
 
@@ -136,8 +135,8 @@ export const generateSingleClientHistory = (line: string): BaseOperation[] => {
 export const generateSerialization = (
     history: History,
     serialization: string
-): BaseOperation[] => {
-    const map: { [key: string]: BaseOperation } = {};
+): Operation[] => {
+    const map: { [key: string]: Operation } = {};
     Object.values(history)
         .flatMap(_ => _)
         .forEach(
@@ -149,7 +148,7 @@ export const generateSerialization = (
 };
 
 export const sortOperations = (ops: History | SystemSerialization) => {
-    Object.values(ops).forEach((arr: BaseOperation[]) => {
+    Object.values(ops).forEach((arr: Operation[]) => {
         arr.sort((a, b) => a.startTime - b.startTime);
     });
 

@@ -54,7 +54,7 @@ export const monotonicWritesExplanationFragment = (
         },
         {
             type: "string",
-            content: "became visible to",
+            content: " became visible to ",
         },
         {
             type: "client",
@@ -62,15 +62,15 @@ export const monotonicWritesExplanationFragment = (
         },
         {
             type: "string",
-            content: "before",
+            content: " before ",
         },
         {
             type: "operation",
-            operation: secondHistoricalWrite,
+            operation: secondSerializedWrite,
         },
         {
             type: "string",
-            content: "became visible to it. However,",
+            content: ". However, ",
         },
         {
             type: "client",
@@ -78,7 +78,7 @@ export const monotonicWritesExplanationFragment = (
         },
         {
             type: "string",
-            content: ", who originally performed these writes, performed",
+            content: ", who originally performed these writes, performed ",
         },
         {
             type: "operation",
@@ -87,15 +87,39 @@ export const monotonicWritesExplanationFragment = (
         {
             type: "string",
             emphasis: [],
-            content: "before",
+            content: " before ",
         },
         {
             type: "operation",
-            operation: secondSerializedWrite,
+            operation: secondHistoricalWrite,
         },
         {
             type: "string",
             content: ".",
         },
     ];
+};
+
+export const fragmentsToString = (fragments: ExplanationFragment[]): string => {
+    let result = "";
+
+    for (const fragment of fragments) {
+        switch (fragment.type) {
+            case "operation":
+                result += `Operation ${fragment.operation.operationName}`;
+                break;
+            case "client":
+                result += `Client ${fragment.clientId}`;
+                break;
+            case "string":
+                result += fragment.content;
+                break;
+            case "list":
+                result += fragment.ordered ? "1. " : "- ";
+                result += fragmentsToString(fragment.children);
+                break;
+        }
+    }
+
+    return result;
 };

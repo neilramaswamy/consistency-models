@@ -22,31 +22,34 @@ function everyProcessHistory(
     );
 }
 
-function everySerialization(
-    systemSerialization: SystemSerialization,
-    callback: (processId: string, serialization: Serialization) => boolean
+function forEachClientHistory(
+    history: History,
+    callback: (clientId: string, operations: Operation[]) => void
 ) {
-    return Object.entries(systemSerialization).every(([id, serialization]) => {
-        const val = callback(id, serialization);
-        return val;
-    });
-}
-
-function anySerialization(
-    systemSerialization: SystemSerialization,
-    callback: (processId: string, serialization: Serialization) => boolean
-) {
-    return Object.entries(systemSerialization).some(([id, serialization]) =>
+    return Object.entries(history).forEach(([id, serialization]) =>
         callback(id, serialization)
     );
 }
 
-function filterNonProcessOperations(
-    processId: string,
-    history: History,
-    serialization: Serialization
+function everySerialization(
+    systemSerialization: SystemSerialization,
+    callback: (clientId: number, serialization: Serialization) => boolean
 ) {
-    return serialization.filter(s => history[processId].includes(s));
+    return Object.entries(systemSerialization).every(([id, serialization]) => {
+        const val = callback(parseInt(id), serialization);
+        return val;
+    });
+}
+
+function forEachSerialization(
+    systemSerialization: SystemSerialization,
+    callback: (processId: string, serialization: Serialization) => void
+) {
+    return Object.entries(systemSerialization).forEach(
+        ([id, serialization]) => {
+            callback(id, serialization);
+        }
+    );
 }
 
 export function isRval(
@@ -104,51 +107,11 @@ export function isMonotonicWrites(
     history: History,
     systemSerialization: SystemSerialization
 ): PredicateResult {
-    /*
-        Why would monotonic writes fail?
-
-        For serialization i, it would fail because it contains the writes for another client k not in that order. So,
-
-
-    */
-    const satisfied = everySerialization(
-        systemSerialization,
-        (process, serialization) => {
-            const writes = serialization.filter(
-                s => s.type == OperationType.Write
-            );
-
-            // Every processes' writes should be a subsequence of the current serialization
-            return everyProcessHistory(history, (processId, operations) => {
-                let lastIndex = -1;
-
-                return operations
-                    .filter(op => op.type == OperationType.Write)
-                    .every(writeOp => {
-                        const nextIndex = writes.findIndex(
-                            o => o.operationName === writeOp.operationName
-                        );
-                        const isNext = nextIndex > lastIndex;
-                        lastIndex = nextIndex;
-                        return isNext;
-                    });
-            });
-        }
-    );
-
-    return { satisfied, explanation: [] };
-}
-
-export function isMonotonicWritesWithExplanation(
-    history: History,
-    systemSerialization: SystemSerialization
-): PredicateResult {
     // For every pair of writes (sliding window) in every history, every serialization
     // needs to see them in that order.
+    let violationList: ExplanationFragment[] = [];
 
-    everyProcessHistory(history, (historyId, operations) => {
-        const violations: ExplanationFragment[][] = [];
-
+    forEachClientHistory(history, (clientHistoryId, operations) => {
         const writesInProcessHistory = operations.filter(
             o => o.type == OperationType.Write
         );
@@ -159,9 +122,9 @@ export function isMonotonicWritesWithExplanation(
 
             // Now, check that in every serialization, currHistoricalWrite comes
             // before nextHistoricalWrite.
-            everySerialization(
+            forEachSerialization(
                 systemSerialization,
-                (serialiationId, serialization) => {
+                (clientSerializationId, serialization) => {
                     const currSerializationIndex = serialization.findIndex(
                         o =>
                             o.operationName ===
@@ -177,14 +140,14 @@ export function isMonotonicWritesWithExplanation(
                     assert(nextSerializationIndex !== -1);
 
                     if (currSerializationIndex > nextSerializationIndex) {
-                        violations.push(
+                        violationList = violationList.concat(
                             monotonicWritesExplanationFragment(
-                                parseInt(historyId),
-                                parseInt(serialiationId),
+                                parseInt(clientHistoryId),
+                                parseInt(clientSerializationId),
                                 currHistoricalWrite,
                                 nextHistoricalWrite,
-                                serialization[currSerializationIndex],
-                                serialization[nextSerializationIndex]
+                                serialization[nextSerializationIndex],
+                                serialization[currSerializationIndex]
                             )
                         );
                     }
@@ -193,7 +156,10 @@ export function isMonotonicWritesWithExplanation(
         }
     });
 
-    return undefined;
+    return {
+        satisfied: violationList.length === 0,
+        explanation: violationList,
+    };
 }
 
 export function isMonotonicReads(
@@ -384,7 +350,10 @@ export function isPRAM(
     systemSerialization: SystemSerialization
 ) {
     const monotonicReads = isMonotonicReads(history, systemSerialization);
-    const monoticWrites = isMonotonicWrites(history, systemSerialization);
+    const monoticWrites = isMonotonicWrites(
+        history,
+        systemSerialization
+    ).satisfied;
     const readYourWrites = isReadYourWrites(history, systemSerialization);
     const clientOrder = isClientOrder(history, systemSerialization);
 

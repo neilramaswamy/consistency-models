@@ -6,9 +6,11 @@ import {
     isWritesFollowReads,
     isLinearizable,
     isSequential,
+    isMonotonicWrites,
 } from "./predicates";
 import { describe, test, expect } from "@jest/globals";
 import { generateHistoryFromString, generateSerialization } from "./util";
+import { fragmentsToString } from "./explanation";
 
 describe("PRAM", () => {
     const history = generateHistoryFromString(`
@@ -304,5 +306,27 @@ describe("single order", () => {
 
         expect(isSingleOrder(history, { 0: s0OutOfOrder, 1: s1 })).toBe(false);
         expect(isSingleOrder(history, { 0: s0InOrder, 1: s1 })).toBe(true);
+    });
+});
+
+describe("monotonic writes", () => {
+    test("monotonic writes generates an explanation for a violation", () => {
+        const history = generateHistoryFromString(`
+        ---[A:x<-1]----[B:x<-2]------------
+        -----------------------------------
+        `);
+
+        const s0 = generateSerialization(history, "A B");
+        const s1 = generateSerialization(history, "B A");
+
+        const result = isMonotonicWrites(history, { 0: s0, 1: s1 });
+
+        expect(result.satisfied).toBe(false);
+        expect(fragmentsToString(result.explanation)).toBe(
+            "Operation B became " +
+                "visible to Client 1 before Operation A. However, Client 0, who " +
+                "originally performed these writes, performed Operation A before " +
+                "Operation B."
+        );
     });
 });
