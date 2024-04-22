@@ -1,4 +1,10 @@
 // some helper functions
+import { assert } from "console";
+import {
+    ExplanationFragment,
+    PredicateResult,
+    monotonicWritesExplanationFragment,
+} from "./explanation";
 import {
     History,
     SystemSerialization,
@@ -97,26 +103,97 @@ export function isReadYourWrites(
 export function isMonotonicWrites(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    return everySerialization(systemSerialization, (process, serialization) => {
-        const writes = serialization.filter(s => s.type == OperationType.Write);
+): PredicateResult {
+    /*
+        Why would monotonic writes fail?
 
-        // Every processes' writes should be a subsequence of the current serialization
-        return everyProcessHistory(history, (processId, operations) => {
-            let lastIndex = -1;
+        For serialization i, it would fail because it contains the writes for another client k not in that order. So,
 
-            return operations
-                .filter(op => op.type == OperationType.Write)
-                .every(writeOp => {
-                    const nextIndex = writes.findIndex(
-                        o => o.operationName === writeOp.operationName
+
+    */
+    const satisfied = everySerialization(
+        systemSerialization,
+        (process, serialization) => {
+            const writes = serialization.filter(
+                s => s.type == OperationType.Write
+            );
+
+            // Every processes' writes should be a subsequence of the current serialization
+            return everyProcessHistory(history, (processId, operations) => {
+                let lastIndex = -1;
+
+                return operations
+                    .filter(op => op.type == OperationType.Write)
+                    .every(writeOp => {
+                        const nextIndex = writes.findIndex(
+                            o => o.operationName === writeOp.operationName
+                        );
+                        const isNext = nextIndex > lastIndex;
+                        lastIndex = nextIndex;
+                        return isNext;
+                    });
+            });
+        }
+    );
+
+    return { satisfied, explanation: [] };
+}
+
+export function isMonotonicWritesWithExplanation(
+    history: History,
+    systemSerialization: SystemSerialization
+): PredicateResult {
+    // For every pair of writes (sliding window) in every history, every serialization
+    // needs to see them in that order.
+
+    everyProcessHistory(history, (historyId, operations) => {
+        const violations: ExplanationFragment[][] = [];
+
+        const writesInProcessHistory = operations.filter(
+            o => o.type == OperationType.Write
+        );
+
+        for (let i = 0; i < writesInProcessHistory.length - 1; i++) {
+            const currHistoricalWrite = writesInProcessHistory[i];
+            const nextHistoricalWrite = writesInProcessHistory[i + 1];
+
+            // Now, check that in every serialization, currHistoricalWrite comes
+            // before nextHistoricalWrite.
+            everySerialization(
+                systemSerialization,
+                (serialiationId, serialization) => {
+                    const currSerializationIndex = serialization.findIndex(
+                        o =>
+                            o.operationName ===
+                            currHistoricalWrite.operationName
                     );
-                    const isNext = nextIndex > lastIndex;
-                    lastIndex = nextIndex;
-                    return isNext;
-                });
-        });
+                    const nextSerializationIndex = serialization.findIndex(
+                        o =>
+                            o.operationName ===
+                            nextHistoricalWrite.operationName
+                    );
+
+                    assert(currSerializationIndex !== -1);
+                    assert(nextSerializationIndex !== -1);
+
+                    if (currSerializationIndex > nextSerializationIndex) {
+                        violations.push(
+                            monotonicWritesExplanationFragment(
+                                parseInt(historyId),
+                                parseInt(serialiationId),
+                                currHistoricalWrite,
+                                nextHistoricalWrite,
+                                serialization[currSerializationIndex],
+                                serialization[nextSerializationIndex]
+                            )
+                        );
+                    }
+                }
+            );
+        }
     });
+
+    return undefined;
 }
 
 export function isMonotonicReads(

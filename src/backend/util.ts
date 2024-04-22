@@ -1,6 +1,8 @@
+import { newOpId } from "./opId";
 import {
+    AnyOperation,
+    BaseOperation,
     History,
-    Operation,
     OperationType,
     SystemSerialization,
 } from "./types";
@@ -44,11 +46,7 @@ export const generateHistoryFromString = (h: string): History => {
 
     let history: History = {};
     processes.forEach((line, proc) => {
-        const operations: Operation[] = generateSessionProjection(line).map(
-            // Add the isOriginal property here, since we know that all operations in a history
-            // are original, i.e. not a result of message passing
-            op => ({ ...op, isOriginal: true })
-        );
+        const operations: BaseOperation[] = generateSingleClientHistory(line);
         history[proc] = operations;
     });
 
@@ -65,20 +63,20 @@ export const generateSerializationFromString = (
     serializations.forEach((line, proc) => {
         const currProcHistory = history[proc];
 
-        const operations: Operation[] = generateSessionProjection(line).map(
-            op => {
-                // If this operation exists in the current process history, then its original.
-                const originalOp = currProcHistory.find(
-                    historyOp => historyOp.operationName == op.operationName
-                );
+        const operations: AnyOperation[] = generateSingleClientHistory(
+            line
+        ).map(op => {
+            // If this operation exists in the current process history, then its original.
+            const originalOp = currProcHistory.find(
+                historyOp => historyOp.operationName == op.operationName
+            );
 
-                if (originalOp) {
-                    return originalOp;
-                } else {
-                    return { ...op, isOriginal: false };
-                }
+            if (originalOp) {
+                return originalOp;
+            } else {
+                return { ...op };
             }
-        );
+        });
 
         systemSerialization[proc] = operations;
     });
@@ -92,10 +90,8 @@ export const generateSerializationFromString = (
 //
 // into a list of operations. The operations don't have the isOriginal property, since that can't
 // be inferred using just the given string.
-export const generateSessionProjection = (
-    line: string
-): Omit<Operation, "isOriginal">[] => {
-    let operations: Omit<Operation, "isOriginal">[] = [];
+export const generateSingleClientHistory = (line: string): BaseOperation[] => {
+    let operations: BaseOperation[] = [];
 
     const regex = /\[([A-Z]):([a-z])(<-|->)\s*(\d)\]/g;
     const matches = line.matchAll(regex);
@@ -111,15 +107,18 @@ export const generateSessionProjection = (
         // )
 
         const type = arrow === "->" ? OperationType.Read : OperationType.Write;
+        const operationId = newOpId();
 
         const startTime = match.index || 0;
         // Subtract one since the end time is inclusive and then just add a bit
         const endTime = startTime + match[0].length - 1;
 
         operations.push({
-            operationName,
-
             type,
+            operationId,
+            forHistory: true,
+
+            operationName,
             value,
 
             startTime,
@@ -137,8 +136,8 @@ export const generateSessionProjection = (
 export const generateSerialization = (
     history: History,
     serialization: string
-): Operation[] => {
-    const map: { [key: string]: Operation } = {};
+): BaseOperation[] => {
+    const map: { [key: string]: BaseOperation } = {};
     Object.values(history)
         .flatMap(_ => _)
         .forEach(
@@ -150,7 +149,7 @@ export const generateSerialization = (
 };
 
 export const sortOperations = (ops: History | SystemSerialization) => {
-    Object.values(ops).forEach((arr: Operation[]) => {
+    Object.values(ops).forEach((arr: BaseOperation[]) => {
         arr.sort((a, b) => a.startTime - b.startTime);
     });
 
