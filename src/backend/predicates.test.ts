@@ -9,7 +9,11 @@ import {
     isMonotonicWrites,
 } from "./predicates";
 import { describe, test, expect } from "@jest/globals";
-import { generateHistoryFromString, generateSerialization } from "./util";
+import {
+    generateHistoryFromString,
+    generateSerialization,
+    generateSerializationFromString,
+} from "./util";
 import { fragmentsToString } from "./explanation";
 
 describe("PRAM", () => {
@@ -316,10 +320,15 @@ describe("monotonic writes", () => {
         -----------------------------------
         `);
 
-        const s0 = generateSerialization(history, "A B");
-        const s1 = generateSerialization(history, "B A");
+        const serialization = generateSerializationFromString(
+            history,
+            `
+        ---[A:x<-1]----[B:x<-2]------------
+        -----------------[B:x<-2]-[A:x<-1]-
+        `
+        );
 
-        const result = isMonotonicWrites(history, { 0: s0, 1: s1 });
+        const result = isMonotonicWrites(history, serialization);
 
         expect(result.satisfied).toBe(false);
         expect(fragmentsToString(result.explanation)).toBe(
@@ -327,6 +336,52 @@ describe("monotonic writes", () => {
                 "visible to Client 1 before Operation A. However, Client 0, who " +
                 "originally performed these writes, performed Operation A before " +
                 "Operation B."
+        );
+    });
+
+    test("monotonic writes can detect three out-of-order visibility operations", () => {
+        const history = generateHistoryFromString(`
+        ----[A:x<-1]---[B:x<-2]---[C:x<-3]----------------------------------
+        --------------------------------------------------------------------
+        `);
+
+        const serialization = generateSerializationFromString(
+            history,
+            `
+        ----[A:x<-1]---[B:x<-2]---[C:x<-3]----------------------------------
+        -----------------------------[C:x<-3]---[B:x<-2]---[A:x<-1]--------- 
+        `
+        );
+
+        const result = isMonotonicWrites(history, serialization);
+
+        expect(result.satisfied).toBe(false);
+
+        expect(fragmentsToString(result.explanation)).toBe(
+            "Operation B became visible to Client 1 before Operation A. However, Client 0, who originally performed these writes, performed Operation A before Operation B." +
+                "Operation C became visible to Client 1 before Operation B. However, Client 0, who originally performed these writes, performed Operation B before Operation C."
+        );
+    });
+
+    test("monotonic writes can detect out-of-order visibility operations amid in-order visibility operations", () => {
+        const history = generateHistoryFromString(`
+        --------------------------------------------------------------------
+        ----[A:x<-1]---[B:x<-2]---[C:x<-3]----------------------------------
+        `);
+
+        const serialization = generateSerializationFromString(
+            history,
+            `
+        -----------------------------[A:x<-1]---[C:x<-3]---[B:x<-2]--------- 
+        ----[A:x<-1]---[B:x<-2]---[C:x<-3]----------------------------------
+        `
+        );
+
+        const result = isMonotonicWrites(history, serialization);
+
+        expect(result.satisfied).toBe(false);
+        expect(fragmentsToString(result.explanation)).toBe(
+            "Operation C became visible to Client 0 before Operation B. However, Client 1, who originally performed these writes, performed Operation B before Operation C."
         );
     });
 });
