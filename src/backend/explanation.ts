@@ -1,4 +1,4 @@
-import { Operation } from "./types";
+import { Operation, operationTypeToString } from "./types";
 
 export interface PredicateResult {
     satisfied: boolean;
@@ -30,6 +30,69 @@ export type ExplanationFragment =
           ordered: boolean;
           children: ExplanationFragment[];
       };
+
+export const monotonicReadsExplanationFragment = (
+    clientId: number,
+    firstRead: Operation,
+    firstWriteOrVisibility: Operation,
+    laterRead: Operation,
+    earlierWriteOrVisibility: Operation
+): ExplanationFragment[] => {
+    return [
+        {
+            type: "client",
+            clientId,
+        },
+        {
+            type: "string",
+            content: " had a read, ",
+        },
+        {
+            type: "operation",
+            operation: firstRead,
+        },
+        {
+            type: "string",
+            content: `, which returned the value from ${operationTypeToString(
+                firstWriteOrVisibility
+            )}`,
+        },
+        {
+            type: "operation",
+            operation: firstWriteOrVisibility,
+        },
+        {
+            type: "string",
+            content: ". However, a subsequent read, ",
+        },
+        {
+            type: "operation",
+            operation: laterRead,
+        },
+        {
+            type: "string",
+            content: ", returned ",
+        },
+        {
+            type: "operation",
+            operation: earlierWriteOrVisibility,
+        },
+        {
+            type: "string",
+            content: `, which was a ${operationTypeToString(
+                earlierWriteOrVisibility
+            )} operation that occurred before `,
+        },
+        {
+            type: "operation",
+            operation: firstWriteOrVisibility,
+        },
+        {
+            type: "string",
+            content: ".",
+        },
+    ];
+};
 
 /*
 <Operation B> became visible to client 2 before <Operation A> became visible to it.

@@ -5,8 +5,19 @@
 export enum OperationType {
     Read = 1,
     Write,
-    Visiility,
+    Visibility,
 }
+
+export const operationTypeToString = (type: OperationType): string => {
+    switch (type) {
+        case OperationType.Read:
+            return "read";
+        case OperationType.Write:
+            return "write";
+        case OperationType.Visibility:
+            return "visibility";
+    }
+};
 
 /**
  * Operations in histories have type OperationType.Read or OperationType.Write.

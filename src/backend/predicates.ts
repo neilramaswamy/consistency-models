@@ -3,6 +3,7 @@ import { assert } from "console";
 import {
     ExplanationFragment,
     PredicateResult,
+    monotonicReadsExplanationFragment,
     monotonicWritesExplanationFragment,
 } from "./explanation";
 import {
@@ -101,6 +102,46 @@ export function isReadYourWrites(
             });
         }
     );
+}
+
+export function isMonotonicReadsWithExplanation(
+    history: History,
+    systemSerialization: SystemSerialization
+): PredicateResult {
+    // For every serialization, for every read:
+    // Find the index of the write/visibility result corresponding to it
+    // If the current index is less than the previous index, we've regressed, and that's an exception
+    let violationList: ExplanationFragment[] = [];
+
+    forEachSerialization(systemSerialization, (clientId, serialization) => {
+        let previousWriteOrVisibilityIndex = -1;
+
+        for (let i = 0; i < serialization.length; i++) {
+            const currOp = serialization[i];
+
+            if (currOp.type === OperationType.Read) {
+                const writeOrVisibilityIndex = serialization.findIndex(
+                    (op, index) =>
+                        (op.type === OperationType.Write ||
+                            op.type === OperationType.Visibility) &&
+                        op.value === currOp.value
+                );
+
+                if (writeOrVisibilityIndex === -1) {
+                    // TODO(neil): This is a tricky case: we read something we never wrote.
+                }
+
+                if (writeOrVisibilityIndex < previousWriteOrVisibilityIndex) {
+                    // TODO: record the error
+                }
+            }
+        }
+    });
+
+    return {
+        satisfied: violationList.length === 0,
+        explanation: violationList,
+    };
 }
 
 export function isMonotonicWrites(
