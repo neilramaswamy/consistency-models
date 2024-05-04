@@ -31,7 +31,7 @@ export type ExplanationFragment =
           children: ExplanationFragment[];
       };
 
-export const monotonicReadsExplanationFragment = (
+export const monotonicReadsRegressionExplanationFragment = (
     clientId: number,
     firstRead: Operation,
     firstWriteOrVisibility: Operation,
@@ -45,7 +45,7 @@ export const monotonicReadsExplanationFragment = (
         },
         {
             type: "string",
-            content: " had a read, ",
+            content: " performed a read, ",
         },
         {
             type: "operation",
@@ -54,7 +54,7 @@ export const monotonicReadsExplanationFragment = (
         {
             type: "string",
             content: `, which returned the value from ${operationTypeToString(
-                firstWriteOrVisibility
+                firstWriteOrVisibility.type
             )}`,
         },
         {
@@ -80,7 +80,7 @@ export const monotonicReadsExplanationFragment = (
         {
             type: "string",
             content: `, which was a ${operationTypeToString(
-                earlierWriteOrVisibility
+                earlierWriteOrVisibility.type
             )} operation that occurred before `,
         },
         {
@@ -90,6 +90,89 @@ export const monotonicReadsExplanationFragment = (
         {
             type: "string",
             content: ".",
+        },
+    ];
+};
+
+export const rValNullNonReadExplanationFragment = (
+    clientId: number,
+    readOp: Operation
+): ExplanationFragment[] => {
+    return [
+        {
+            type: "client",
+            clientId,
+        },
+        {
+            type: "string",
+            content: ` performed a read, `,
+        },
+        {
+            type: "operation",
+            operation: readOp,
+        },
+        {
+            type: "string",
+            content: `, which returned ${readOp.value}, even though no value was previously written or visible.`,
+        },
+    ];
+};
+
+export const rValExplanationFragment = (
+    clientId: number,
+    directlyPreviousWriteOrVisibilityOp: Operation,
+    readOp: Operation
+): ExplanationFragment[] => {
+    return [
+        {
+            type: "client",
+            clientId,
+        },
+        {
+            type: "string",
+            content: " performed a read, ",
+        },
+        {
+            type: "operation",
+            operation: readOp,
+        },
+        {
+            type: "string",
+            content:
+                ", which didn't return the value from the most recent write or visibility operation, ",
+        },
+        {
+            type: "operation",
+            operation: directlyPreviousWriteOrVisibilityOp,
+        },
+        {
+            type: "string",
+            content: ".",
+        },
+    ];
+};
+
+export const readYourWritesExplanationFragment = (
+    clientId: number,
+    readOperation: Operation
+): ExplanationFragment[] => {
+    return [
+        {
+            type: "client",
+            clientId,
+        },
+        {
+            type: "string",
+            content: " performed a read, ",
+        },
+        {
+            type: "operation",
+            operation: readOperation,
+        },
+        {
+            type: "string",
+            content:
+                ", which returned a value that it never wrote and that was never visible to it.",
         },
     ];
 };

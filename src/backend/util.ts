@@ -44,7 +44,7 @@ export const generateHistoryFromString = (h: string): History => {
 
     let history: History = {};
     clientHistories.forEach((clientHistory, clientId) => {
-        const operations: Operation[] = generateSingleClientHistory(
+        const operations: Operation[] = generateOperationsFromString(
             clientId,
             clientHistory
         );
@@ -54,7 +54,7 @@ export const generateHistoryFromString = (h: string): History => {
     return history;
 };
 
-export const generateSerializationFromString = (
+export const generateFullSerializationFromString = (
     history: History,
     s: string
 ): SystemSerialization => {
@@ -64,7 +64,7 @@ export const generateSerializationFromString = (
     clientSerializations.forEach((clientSerialization, clientId) => {
         const currClientHistory = history[clientId];
 
-        const operations: Operation[] = generateSingleClientHistory(
+        const operations: Operation[] = generateOperationsFromString(
             clientId,
             clientSerialization
         ).map(op => {
@@ -76,7 +76,7 @@ export const generateSerializationFromString = (
             if (originalOp) {
                 return originalOp;
             } else {
-                return { ...op, type: OperationType.Visiility };
+                return { ...op, type: OperationType.Visibility };
             }
         });
 
@@ -92,7 +92,7 @@ export const generateSerializationFromString = (
 //
 // into a list of operations. The operations don't have the isOriginal property, since that can't
 // be inferred using just the given string.
-export const generateSingleClientHistory = (
+export const generateOperationsFromString = (
     clientId: number,
     line: string
 ): Operation[] => {
@@ -126,25 +126,6 @@ export const generateSingleClientHistory = (
     }
 
     return operations;
-};
-
-/**
- * Generates an array of Operations using a history and a list of processId names separated by
- * space.
- */
-export const generateSerialization = (
-    history: History,
-    serialization: string
-): Operation[] => {
-    const map: { [key: string]: Operation } = {};
-    Object.values(history)
-        .flatMap(_ => _)
-        .forEach(
-            operation => (map[operation.operationName] = { ...operation })
-        );
-
-    const operationIds = serialization.split(" ");
-    return operationIds.map(operationId => map[operationId]);
 };
 
 export const sortOperations = (ops: History | SystemSerialization) => {

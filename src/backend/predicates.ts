@@ -3,8 +3,11 @@ import { assert } from "console";
 import {
     ExplanationFragment,
     PredicateResult,
-    monotonicReadsExplanationFragment,
+    monotonicReadsRegressionExplanationFragment,
     monotonicWritesExplanationFragment,
+    rValExplanationFragment,
+    rValNullNonReadExplanationFragment,
+    readYourWritesExplanationFragment,
 } from "./explanation";
 import {
     History,
@@ -56,86 +59,69 @@ function forEachSerialization(
 export function isRval(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    return everySerialization(
-        systemSerialization,
-        (processId, serialization) => {
-            let lastValue: number | null = null;
+): PredicateResult {
+    let violationList: ExplanationFragment[] = [];
 
-            for (let i = 0; i < serialization.length; i++) {
-                const op = serialization[i];
+    forEachSerialization(systemSerialization, (clientId, serialization) => {
+        let lastNonReadOperation: Operation | null = null;
 
-                if (op.type === OperationType.Write) {
-                    lastValue = op.value;
-                } else {
-                    // Includes the case when lastValue === null
-                    if (lastValue !== op.value) {
-                        return false;
-                    }
+        serialization.forEach(op => {
+            if (op.type !== OperationType.Read) {
+                lastNonReadOperation = op;
+            } else {
+                // If lastValue === null, then we fail RVal. Note that you would also fail
+                // ReadYourWrites in this case.
+                if (lastNonReadOperation === null) {
+                    violationList = violationList.concat(
+                        rValNullNonReadExplanationFragment(
+                            parseInt(clientId),
+                            op
+                        )
+                    );
+                } else if (lastNonReadOperation.value !== op.value) {
+                    violationList = violationList.concat(
+                        rValExplanationFragment(
+                            parseInt(clientId),
+                            lastNonReadOperation,
+                            op
+                        )
+                    );
                 }
             }
+        });
+    });
 
-            return true;
-        }
-    );
+    return {
+        satisfied: violationList.length === 0,
+        explanation: violationList,
+    };
 }
 
 export function isReadYourWrites(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    // put another way, any serialization in which, for a given process,
-    // if you read a value x, the write for x must have happened before that.
-    return everySerialization(
-        systemSerialization,
-        (proccessId, serialization) => {
-            // then, just make sure we read stuff we've written before
-            const writtenValues: number[] = [];
-
-            return serialization.every(op => {
-                if (op.type === OperationType.Write) {
-                    writtenValues.push(op.value);
-                    return true;
-                }
-
-                return writtenValues.includes(op.value);
-            });
-        }
-    );
-}
-
-export function isMonotonicReadsWithExplanation(
-    history: History,
-    systemSerialization: SystemSerialization
 ): PredicateResult {
-    // For every serialization, for every read:
-    // Find the index of the write/visibility result corresponding to it
-    // If the current index is less than the previous index, we've regressed, and that's an exception
     let violationList: ExplanationFragment[] = [];
 
     forEachSerialization(systemSerialization, (clientId, serialization) => {
-        let previousWriteOrVisibilityIndex = -1;
+        let writtenValues: number[] = [];
 
-        for (let i = 0; i < serialization.length; i++) {
-            const currOp = serialization[i];
-
-            if (currOp.type === OperationType.Read) {
-                const writeOrVisibilityIndex = serialization.findIndex(
-                    (op, index) =>
-                        (op.type === OperationType.Write ||
-                            op.type === OperationType.Visibility) &&
-                        op.value === currOp.value
-                );
-
-                if (writeOrVisibilityIndex === -1) {
-                    // TODO(neil): This is a tricky case: we read something we never wrote.
-                }
-
-                if (writeOrVisibilityIndex < previousWriteOrVisibilityIndex) {
-                    // TODO: record the error
+        serialization.forEach(op => {
+            if (op.type !== OperationType.Read) {
+                writtenValues.push(op.value);
+            } else {
+                let found = writtenValues.includes(op.value);
+                if (!found) {
+                    // Record the violation
+                    violationList = violationList.concat(
+                        readYourWritesExplanationFragment(
+                            parseInt(clientId),
+                            op
+                        )
+                    );
                 }
             }
-        }
+        });
     });
 
     return {
@@ -177,9 +163,6 @@ export function isMonotonicWrites(
                             nextHistoricalWrite.operationName
                     );
 
-                    assert(currSerializationIndex !== -1);
-                    assert(nextSerializationIndex !== -1);
-
                     if (currSerializationIndex > nextSerializationIndex) {
                         violationList = violationList.concat(
                             monotonicWritesExplanationFragment(
@@ -206,33 +189,43 @@ export function isMonotonicWrites(
 export function isMonotonicReads(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    return everySerialization(
-        systemSerialization,
-        (processId, serialization) => {
-            let writes = serialization
-                .filter(s => s.type == OperationType.Write)
-                .map(s => s.value);
+): PredicateResult {
+    let violations: ExplanationFragment[] = [];
 
-            const reads = serialization.filter(
-                s => s.type == OperationType.Read
-            );
+    forEachSerialization(systemSerialization, (clientId, serialization) => {
+        let writesOrVisibilities = serialization
+            .filter(o => o.type !== OperationType.Read)
+            .map(o => o.value);
+        let reads = serialization.filter(o => o.type === OperationType.Read);
 
-            for (let i = 0; i < reads.length; i++) {
-                const read = reads[i];
-                let writeIndex = writes.indexOf(read.value);
+        let prevWriteIndex = -1;
+        for (let i = 0; i < reads.length; i++) {
+            const read = reads[i];
+            const writeIndex = writesOrVisibilities.indexOf(read.value);
 
-                // Two cases: you read something you NEVER wrote, or you regress on your writes.
-                if (writeIndex < 0) {
-                    return false;
-                }
-
-                writes = writes.slice(writeIndex + 1);
+            if (writeIndex < 0) {
+                // We read something we never wrote.
+            } else if (writeIndex < prevWriteIndex) {
+                // We regressed on our writes.
+                violations = violations.concat(
+                    monotonicReadsRegressionExplanationFragment(
+                        parseInt(clientId),
+                        reads[i - 1],
+                        serialization[prevWriteIndex],
+                        reads[i],
+                        serialization[writeIndex]
+                    )
+                );
+            } else {
+                prevWriteIndex = writeIndex;
             }
-
-            return true;
         }
-    );
+    });
+
+    return {
+        satisfied: violations.length === 0,
+        explanation: violations,
+    };
 }
 
 function setify(ops: Operation[]) {
@@ -247,6 +240,16 @@ function setify(ops: Operation[]) {
     return set;
 }
 
+/**
+ * Writes follow reads say that:
+ *
+ * writeA -> readB - so -> writeC
+ *
+ *
+ * @param history
+ * @param systemSerialization
+ * @returns
+ */
 export function isWritesFollowReads(
     history: History,
     systemSerialization: SystemSerialization
@@ -322,7 +325,22 @@ function isSubset(set1: Set<string>, set2: Set<string>) {
     return true;
 }
 
-// Returns true if the ordering of writes on every client is the same.
+/**
+ * SingleOrder returns true if all of the serializations in the system serialization
+ * have the same write and visibility operations.
+ *
+ * The explanation that we choose to give tries to be as simple as possible. If we
+ * have the serializations [a b c], [a b c], and [a, c, b], we'll say that the last
+ * serialization differed from the other ones. If we had [a b c], [c b a], and [b c a],
+ * then we'll say that all of the serializations differed from each other.
+ *
+ * Of course, we can't cover every single case. The algorithm is as follows: first, we
+ * map each unique ordering of write and visibility operations that we have. If there's
+ * only 1, we have a single order. Otherwise:
+ *
+ *  - If one serialization differs from the others, we'll say that serialization differs.
+ *  - If all serializations differ from each other, we'll say that all serializations differ.
+ */
 export function isSingleOrder(
     history: History,
     systemSerialization: SystemSerialization
@@ -332,19 +350,21 @@ export function isSingleOrder(
     }
 
     const firstSerialization = systemSerialization[0]
-        .filter(s => s.type === OperationType.Write)
+        .filter(s => s.type !== OperationType.Read)
         .map(s => s.operationName)
         .join(" ");
+
+    console.log(firstSerialization);
 
     return everySerialization(
         systemSerialization,
         (processId, serialization) => {
-            return (
-                serialization
-                    .filter(s => s.type === OperationType.Write)
-                    .map(s => s.operationName)
-                    .join(" ") === firstSerialization
-            );
+            let other = serialization
+                .filter(s => s.type !== OperationType.Read)
+                .map(s => s.operationName)
+                .join(" ");
+            console.log(other);
+            return other == firstSerialization;
         }
     );
 }

@@ -34,6 +34,7 @@ export function ResultsTree(props: ResultsTreeProps) {
     async function render() {
         if (!containerRef) return;
         const result = isLinearizable(props.history, props.systemSerialization);
+        console.log(result);
 
         const classSpecs = [
             getClassSpec("A", result.isLinearizable),

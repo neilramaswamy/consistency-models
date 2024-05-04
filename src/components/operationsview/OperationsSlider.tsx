@@ -1,10 +1,17 @@
 import { createSignal, createEffect, onMount } from "solid-js";
 import "./OperationsSlider.css";
-import { Operation, History, OriginalOperationsByName } from "~/backend/types";
+import {
+    Operation,
+    History,
+    OriginalOperationsByName,
+    OperationType,
+} from "~/backend/types";
 import OperationView from "~/components/operationsview/OperationView";
 
 export default function OperationsSlider(props: OperationsSliderProps) {
     const [bounds, setBounds] = createSignal<DOMRect>();
+
+    console.log("OperationsSlider", props);
 
     function canMove(
         px: number | undefined,
@@ -87,7 +94,7 @@ export default function OperationsSlider(props: OperationsSliderProps) {
                         type={props.type}
                         op={o}
                         canMove={px => canMove(px, o)}
-                        draggable={!o.isOriginal}
+                        draggable={o.type === OperationType.Visibility}
                         onMoved={px => {
                             if (props.type === "Serializations") {
                                 props.onOperationMoved(o, pxToTrackUnits(px));

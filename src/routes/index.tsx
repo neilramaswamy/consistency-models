@@ -28,6 +28,8 @@ export default function Home() {
     const [serial, setSerial] =
         createSignal<SystemSerialization>(serialization);
 
+    console.log(serialization);
+
     return (
         <main>
             <Title>Consistency Models</Title>

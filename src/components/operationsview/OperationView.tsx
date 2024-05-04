@@ -63,6 +63,16 @@ export default function OperationView(props: OperationsSliderProps) {
         moveDrag(e.touches[0]);
     };
 
+    let characterDescriptor = (() => {
+        if (props.op.type == OperationType.Write) {
+            return "W";
+        } else if (props.op.type == OperationType.Read) {
+            return "R";
+        } else {
+            return "V";
+        }
+    })();
+
     return (
         <div
             class={`operation ${
@@ -85,11 +95,7 @@ export default function OperationView(props: OperationsSliderProps) {
         >
             <span class="name">{props.op.operationName}</span>
             <div class="info">
-                <span>
-                    {`${props.op.type === OperationType.Read ? "R" : "W"}(${
-                        props.op.value
-                    })`}
-                </span>
+                <span>{`${characterDescriptor}(${props.op.value})`}</span>
             </div>
         </div>
     );

@@ -11,8 +11,7 @@ import {
 import { describe, test, expect } from "@jest/globals";
 import {
     generateHistoryFromString,
-    generateSerialization,
-    generateSerializationFromString,
+    generateFullSerializationFromString,
 } from "./util";
 import { fragmentsToString } from "./explanation";
 
@@ -34,7 +33,17 @@ describe("PRAM", () => {
     const abdc = generateSerialization(history, "A B D C");
 
     test("is true with the same linearizable sequence", () => {
-        expect(isPRAM(history, { 0: acd, 1: abcd })).toEqual({
+        // A C D
+        // A B C D
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+        ----[A:x<-1]-------------[C:x<-2]---[D:x<-3]-
+        ----[A:x<-1]--[B:x->1]---[C:x<-2]---[D:x<-3]-
+        `
+        );
+
+        expect(isPRAM(history, serialization)).toEqual({
             isMonotonicReads: true,
             isMonotonicWrites: true,
             isReadYourWrites: true,
@@ -320,7 +329,7 @@ describe("monotonic writes", () => {
         -----------------------------------
         `);
 
-        const serialization = generateSerializationFromString(
+        const serialization = generateFullSerializationFromString(
             history,
             `
         ---[A:x<-1]----[B:x<-2]------------
