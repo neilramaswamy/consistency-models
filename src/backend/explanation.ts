@@ -17,8 +17,17 @@ export type ExplanationFragment =
           operation: Operation;
       }
     | {
+          // Sugar so that pluralization is handled automatically
+          type: "operations";
+          operations: Operation[];
+      }
+    | {
           type: "client";
           clientId: number;
+      }
+    | {
+          type: "clients";
+          clientIds: number[];
       }
     | {
           type: "string";
@@ -86,6 +95,65 @@ export const monotonicReadsRegressionExplanationFragment = (
         {
             type: "operation",
             operation: firstWriteOrVisibility,
+        },
+        {
+            type: "string",
+            content: ".",
+        },
+    ];
+};
+
+export const writesFollowReadsViolatedForCausalPair = (
+    sourceWrite: Operation,
+    read: Operation,
+    subsequentWrite: Operation,
+    violatingClientSerializations: number[]
+): ExplanationFragment[] => {
+    return [
+        {
+            type: "operation",
+            operation: sourceWrite,
+        },
+        {
+            type: "string",
+            content: ` was a write operation whose value was read by `,
+        },
+        {
+            type: "operation",
+            operation: read,
+        },
+        {
+            type: "string",
+            content: `. The read was then followed by a subsequent write, `,
+        },
+        {
+            type: "operation",
+            operation: subsequentWrite,
+        },
+        {
+            type: "string",
+            content: `. Thus, operation `,
+        },
+        {
+            type: "operation",
+            operation: sourceWrite,
+        },
+        {
+            type: "string",
+            content: ` should come before `,
+        },
+        {
+            type: "operation",
+            operation: subsequentWrite,
+        },
+        {
+            type: "string",
+            content:
+                " in all serializations. However, this was not the case for clients ",
+        },
+        {
+            type: "clients",
+            clientIds: violatingClientSerializations,
         },
         {
             type: "string",
@@ -173,6 +241,30 @@ export const readYourWritesExplanationFragment = (
             type: "string",
             content:
                 ", which returned a value that it never wrote and that was never visible to it.",
+        },
+    ];
+};
+
+export const realTimeExplanationFragment = (
+    sourceWrite: Operation,
+    visibilityOperation: Operation
+): ExplanationFragment[] => {
+    return [
+        {
+            type: "operation",
+            operation: visibilityOperation,
+        },
+        {
+            type: "string",
+            content: " didn't overlap with its issuing write operation, ",
+        },
+        {
+            type: "operation",
+            operation: sourceWrite,
+        },
+        {
+            type: "string",
+            content: ".",
         },
     ];
 };

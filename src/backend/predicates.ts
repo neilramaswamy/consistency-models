@@ -8,6 +8,8 @@ import {
     rValExplanationFragment,
     rValNullNonReadExplanationFragment,
     readYourWritesExplanationFragment,
+    realTimeExplanationFragment,
+    writesFollowReadsViolatedForCausalPair,
 } from "./explanation";
 import {
     History,
@@ -28,10 +30,10 @@ function everyProcessHistory(
 
 function forEachClientHistory(
     history: History,
-    callback: (clientId: string, operations: Operation[]) => void
+    callback: (clientId: number, operations: Operation[]) => void
 ) {
     return Object.entries(history).forEach(([id, serialization]) =>
-        callback(id, serialization)
+        callback(parseInt(id), serialization)
     );
 }
 
@@ -47,11 +49,11 @@ function everySerialization(
 
 function forEachSerialization(
     systemSerialization: SystemSerialization,
-    callback: (processId: string, serialization: Serialization) => void
+    callback: (clientId: number, serialization: Serialization) => void
 ) {
     return Object.entries(systemSerialization).forEach(
         ([id, serialization]) => {
-            callback(id, serialization);
+            callback(parseInt(id), serialization);
         }
     );
 }
@@ -73,15 +75,12 @@ export function isRval(
                 // ReadYourWrites in this case.
                 if (lastNonReadOperation === null) {
                     violationList = violationList.concat(
-                        rValNullNonReadExplanationFragment(
-                            parseInt(clientId),
-                            op
-                        )
+                        rValNullNonReadExplanationFragment(clientId, op)
                     );
                 } else if (lastNonReadOperation.value !== op.value) {
                     violationList = violationList.concat(
                         rValExplanationFragment(
-                            parseInt(clientId),
+                            clientId,
                             lastNonReadOperation,
                             op
                         )
@@ -114,10 +113,7 @@ export function isReadYourWrites(
                 if (!found) {
                     // Record the violation
                     violationList = violationList.concat(
-                        readYourWritesExplanationFragment(
-                            parseInt(clientId),
-                            op
-                        )
+                        readYourWritesExplanationFragment(clientId, op)
                     );
                 }
             }
@@ -166,8 +162,8 @@ export function isMonotonicWrites(
                     if (currSerializationIndex > nextSerializationIndex) {
                         violationList = violationList.concat(
                             monotonicWritesExplanationFragment(
-                                parseInt(clientHistoryId),
-                                parseInt(clientSerializationId),
+                                clientHistoryId,
+                                clientSerializationId,
                                 currHistoricalWrite,
                                 nextHistoricalWrite,
                                 serialization[nextSerializationIndex],
@@ -209,7 +205,7 @@ export function isMonotonicReads(
                 // We regressed on our writes.
                 violations = violations.concat(
                     monotonicReadsRegressionExplanationFragment(
-                        parseInt(clientId),
+                        clientId,
                         reads[i - 1],
                         serialization[prevWriteIndex],
                         reads[i],
@@ -245,6 +241,11 @@ function setify(ops: Operation[]) {
  *
  * writeA -> readB - so -> writeC
  *
+ * So, for every read, we need to find the write (not visibility!) where its value came from.
+ * If it doesn't exist, we move on (that should be caught by ReadYourWrites).
+ *
+ * If it does, we enforce an ordering writeA -> writeC
+ *
  *
  * @param history
  * @param systemSerialization
@@ -253,45 +254,49 @@ function setify(ops: Operation[]) {
 export function isWritesFollowReads(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    let valueMap: { [key: number]: Operation } = {};
+): PredicateResult {
+    // Represents a sourceWrite -vis-> read -so-> futureWrite
+    interface WriteReadWrite {
+        sourceWrite: Operation;
+        read: Operation;
+        futureWrite: Operation;
+    }
 
-    everyProcessHistory(history, (processId, operations) => {
+    let valueToWriteOperation: { [key: number]: Operation } = {};
+
+    // Populate the value -> write operation map
+    forEachClientHistory(history, (clientId, operations) => {
         operations.forEach(op => {
             if (op.type === OperationType.Write) {
-                valueMap[op.value] = op;
+                valueToWriteOperation[op.value] = op;
             }
         });
-
-        return true;
     });
 
     // Now iterate through every operation in every serialization
-    let causalWrites: Set<string> = new Set();
+    let causalWrites: WriteReadWrite[] = [];
 
-    everyProcessHistory(history, (processId, operations) => {
+    forEachClientHistory(history, (clientId, operations) => {
         for (let i = 0; i < operations.length; i++) {
             const op = operations[i];
 
             if (op.type == OperationType.Read) {
-                const associatedWrite = valueMap[op.value];
+                const sourceWrite = valueToWriteOperation[op.value];
 
-                if (associatedWrite === undefined) {
-                    // We read something we never wrote
-                    // TODO(neil): Should we throw an error here?
-                    return false;
+                if (sourceWrite === undefined) {
+                    // If we read something we never wrote, that should be caught by
+                    // ReadYourWrites. WritesFollowReads does not apply for the case that
+                    // for the case that the write is not visible to the read.
                 } else {
                     // Subsequent writes need to come after associatedWrite
                     for (let j = i + 1; j < operations.length; j++) {
                         if (operations[j].type == OperationType.Write) {
                             const futureWrite = operations[j];
-
-                            causalWrites.add(
-                                operationTupleToString(
-                                    associatedWrite,
-                                    futureWrite
-                                )
-                            );
+                            causalWrites.push({
+                                sourceWrite,
+                                read: op,
+                                futureWrite,
+                            });
                         }
                     }
                 }
@@ -301,28 +306,58 @@ export function isWritesFollowReads(
         return true;
     });
 
-    // Make sure causalWrites are respected by every serialization
-    return everySerialization(
-        systemSerialization,
-        (processId, serialization) => {
-            const onlyWrites = serialization.filter(
-                op => op.type === OperationType.Write
+    let violationList: ExplanationFragment[] = [];
+
+    causalWrites.forEach(causalWriteInfo => {
+        let violatingSerializations: number[] = [];
+
+        forEachSerialization(systemSerialization, (clientId, serialization) => {
+            // Find the violation, if any
+
+            const sourceWriteIndex = serialization.findIndex(
+                o =>
+                    o.operationName ===
+                    causalWriteInfo.sourceWrite.operationName
             );
-            const onlyWritesSet = setify(onlyWrites);
+            const futureWriteIndex = serialization.findIndex(
+                o =>
+                    o.operationName ===
+                    causalWriteInfo.futureWrite.operationName
+            );
 
-            return isSubset(causalWrites, onlyWritesSet);
+            // The read might not exist in the current serialization, but the writes need
+            // to exist. Note that, though, sourceWriteIndex and futureWriteIndex might not
+            // be writes in the current serialization. They might be visibility operations.
+            // As such, we check existence based on the operationName.
+            if (sourceWriteIndex < 0) {
+                throw new Error(
+                    `Writes follow reads detected an inconsistency. The source write ${causalWriteInfo.sourceWrite.operationName} is not in the serialization for client ${clientId}.`
+                );
+            } else if (futureWriteIndex < 0) {
+                throw new Error(
+                    `Writes follow reads detected an inconsistency. The future write ${causalWriteInfo.futureWrite.operationName} is not in the serialization for client ${clientId}.`
+                );
+            } else if (sourceWriteIndex > futureWriteIndex) {
+                violatingSerializations.push(clientId);
+            }
+        });
+
+        if (violatingSerializations.length > 0) {
+            violationList = violationList.concat(
+                writesFollowReadsViolatedForCausalPair(
+                    causalWriteInfo.sourceWrite,
+                    causalWriteInfo.read,
+                    causalWriteInfo.futureWrite,
+                    violatingSerializations
+                )
+            );
         }
-    );
-}
+    });
 
-function isSubset(set1: Set<string>, set2: Set<string>) {
-    for (let elem of set1) {
-        if (!set2.has(elem)) {
-            return false;
-        }
-    }
-
-    return true;
+    return {
+        satisfied: violationList.length === 0,
+        explanation: violationList,
+    };
 }
 
 /**
@@ -458,43 +493,59 @@ export function isSequential(
         causal,
         isRval: rval,
         isSingleOrder: singleOrder,
-        isSequential: causal.pram.isPRAM && rval && singleOrder,
+        isSequential: causal.pram.isPRAM && rval.satisfied && singleOrder,
     };
 }
 
-// Returns whether, if A returns before B, then A comes before B in all serializations.
-// However, if B is a read on serialization i, then we only check the condition for serialization i.
+/*
+
+Consider the following history:
+
+    ----[A:x<-  1]-----------------------------------------------------------
+    ---------------------[B:x->  1]---------[C:x<-  2]----------[D:x<-  3]---
+
+And serialization:
+
+    ----[A:x<-  1]-------------------------------------[C:x<-  2]-[D:x<-  3]-
+    ----[A:x<-  1]-------[B:x->  1]---------[C:x<-  2]----------[D:x<-  3]---
+
+By the paper definition of real-time, this is real time. The returns before
+relation is generated via the total order A -> C -> D. Indeed, this is the arbitration
+order as well. However, the C in the 0th serialization does not fit our intuitive notion
+of linearizability, since there needs to be an instantaneous moment in time where the
+effect of C becomes globally visible to all clients.
+
+To make this stricter, the implementation below enforces the following property: for each 
+visibility operation v for write w, v must overlap with w.
+*/
 export function isRealTime(
     history: History,
     systemSerialization: SystemSerialization
-): boolean {
-    // Not defined without an arbitration order
-    if (!isSingleOrder(history, systemSerialization)) {
-        return false;
-    }
-
+): PredicateResult {
     const operationMap: { [key: string]: Operation } = {};
     Object.values(history)
         .flat()
         .map(operation => (operationMap[operation.operationName] = operation));
 
-    return everySerialization(
-        systemSerialization,
-        (processId, serialization) => {
-            for (let i = 0; i < serialization.length; i++) {
-                for (let j = i + 1; j < serialization.length; j++) {
-                    const first = serialization[i];
-                    const second = serialization[j];
+    let violationList: ExplanationFragment[] = [];
 
-                    if (first.endTime >= second.endTime) {
-                        return false;
-                    }
+    forEachSerialization(systemSerialization, (clientId, serialization) => {
+        serialization.forEach(operation => {
+            if (operation.type === OperationType.Visibility) {
+                const sourceWrite = operationMap[operation.operationName];
+                if (!areOverlapping(sourceWrite, operation)) {
+                    violationList = violationList.concat(
+                        realTimeExplanationFragment(sourceWrite, operation)
+                    );
                 }
             }
+        });
+    });
 
-            return true;
-        }
-    );
+    return {
+        satisfied: violationList.length === 0,
+        explanation: violationList,
+    };
 }
 
 export function isLinearizable(
@@ -510,3 +561,7 @@ export function isLinearizable(
         isLinearizable: sequential.isSequential && realTime,
     };
 }
+
+const areOverlapping = (a: Operation, b: Operation): boolean => {
+    return a.startTime < b.endTime && b.startTime < a.endTime;
+};
