@@ -27,10 +27,6 @@ export default function Home() {
     const [serial, setSerial] =
         createSignal<SystemSerialization>(serialization);
 
-    createEffect(() => {
-        console.log(serial());
-    });
-
     return (
         <main>
             <Title>Consistency Models</Title>
@@ -46,8 +42,6 @@ export default function Home() {
                 history={history}
                 operations={serial()}
                 onOperationsChanged={s => {
-                    console.log("changed to ");
-                    console.log(s);
                     setSerial(s as SystemSerialization);
                 }}
             />

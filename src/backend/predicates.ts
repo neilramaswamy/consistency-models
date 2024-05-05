@@ -9,6 +9,7 @@ import {
     rValNullNonReadExplanationFragment,
     readYourWritesExplanationFragment,
     realTimeExplanationFragment,
+    successfullyLinearizableExplanationFragment,
     writesFollowReadsViolatedForCausalPair,
 } from "./explanation";
 import {
@@ -606,11 +607,19 @@ export function isLinearizable(
 ) {
     const sequential = isSequential(history, systemSerialization);
     const realTime = isRealTime(history, systemSerialization);
+    const isLinearizable = sequential.satisfied && realTime.satisfied;
+
+    let explanation: ExplanationFragment[] = [];
+    if (isLinearizable) {
+        explanation = successfullyLinearizableExplanationFragment();
+    }
 
     return {
         sequential,
-        realTime: realTime,
-        isLinearizable: sequential.satisfied && realTime.satisfied,
+        realTime,
+
+        satisfied: isLinearizable,
+        explanation,
     };
 }
 

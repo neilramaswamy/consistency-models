@@ -40,7 +40,7 @@ export function ResultsTree(props: ResultsTreeProps) {
         );
 
         const classSpecs = [
-            getClassSpec("A", nextResult.isLinearizable),
+            getClassSpec("A", nextResult.satisfied),
             getClassSpec("B", nextResult.sequential.satisfied),
             getClassSpec("C", nextResult.realTime.satisfied),
             getClassSpec("D", nextResult.sequential.causal.satisfied),
@@ -78,8 +78,6 @@ export function ResultsTree(props: ResultsTreeProps) {
 
     createEffect(() => {
         render();
-        console.log("new result");
-        console.log(result());
     });
 
     return (
@@ -88,6 +86,7 @@ export function ResultsTree(props: ResultsTreeProps) {
             <div class="results-explanation">
                 <Explanation
                     fragments={[
+                        result().explanation,
                         result().realTime.explanation,
                         result().sequential.rval.explanation,
                         result().sequential.causal.writesFollowReads

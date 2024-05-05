@@ -148,7 +148,7 @@ export const writesFollowReadsViolatedForCausalPair = (
         {
             type: "string",
             content:
-                " in all serializations. However, this was not the case for clients ",
+                " in all serializations. However, this was not the case for ",
         },
         {
             type: "clients",
@@ -371,3 +371,14 @@ export const fragmentsToString = (fragments: ExplanationFragment[]): string => {
 
     return result;
 };
+
+export const successfullyLinearizableExplanationFragment =
+    (): ExplanationFragment[] => {
+        return [
+            {
+                type: "string",
+                content:
+                    "The current serialization linearizes, which means that it satisfies all weaker consistency models. Modify the blue visibility operations in the serialization to see how it affects different consistency models.",
+            },
+        ];
+    };
