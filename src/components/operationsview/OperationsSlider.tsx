@@ -11,8 +11,6 @@ import OperationView from "~/components/operationsview/OperationView";
 export default function OperationsSlider(props: OperationsSliderProps) {
     const [bounds, setBounds] = createSignal<DOMRect>();
 
-    console.log("OperationsSlider", props);
-
     function canMove(
         px: number | undefined,
         op: Operation,

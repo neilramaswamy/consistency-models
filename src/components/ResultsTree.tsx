@@ -2,7 +2,8 @@ import { History, SystemSerialization } from "~/backend/types";
 import { createEffect, createSignal } from "solid-js";
 import { isLinearizable } from "~/backend/predicates";
 import mermaid from "mermaid";
-import "./ResultsTree";
+import "./ResultsTree.css";
+import { Explanation } from "./explanation/Explanation";
 
 // todo: put this somewhere better
 const chartDefBase = `
@@ -29,42 +30,81 @@ function getClassSpec(name: string, predicate: boolean) {
 
 export function ResultsTree(props: ResultsTreeProps) {
     let containerRef: HTMLDivElement | undefined;
-    const [svg, setSvg] = createSignal();
+    const [result, setResult] = createSignal(
+        isLinearizable(props.history, props.systemSerialization)
+    );
 
     async function render() {
-        if (!containerRef) return;
-        const result = isLinearizable(props.history, props.systemSerialization);
-        console.log(result);
+        const nextResult = isLinearizable(
+            props.history,
+            props.systemSerialization
+        );
 
         const classSpecs = [
-            getClassSpec("A", result.isLinearizable),
-            getClassSpec("B", result.sequential.isSequential),
-            getClassSpec("C", result.isRealTime),
-            getClassSpec("D", result.sequential.causal.isCausal),
-            getClassSpec("E", result.sequential.isRval),
-            getClassSpec("F", result.sequential.isSingleOrder),
-            getClassSpec("G", result.sequential.causal.pram.isPRAM),
-            getClassSpec("H", result.sequential.causal.isWritesFollowReads),
-            getClassSpec("I", result.sequential.causal.pram.isMonotonicReads),
-            getClassSpec("J", result.sequential.causal.pram.isMonotonicWrites),
-            getClassSpec("K", result.sequential.causal.pram.isReadYourWrites),
-            getClassSpec("L", result.sequential.causal.pram.isClientOrder),
+            getClassSpec("A", nextResult.isLinearizable),
+            getClassSpec("B", nextResult.sequential.satisfied),
+            getClassSpec("C", nextResult.realTime.satisfied),
+            getClassSpec("D", nextResult.sequential.causal.satisfied),
+            getClassSpec("E", nextResult.sequential.rval.satisfied),
+            getClassSpec("F", nextResult.sequential.singleOrder),
+            getClassSpec("G", nextResult.sequential.causal.pram.satisfied),
+            getClassSpec(
+                "H",
+                nextResult.sequential.causal.writesFollowReads.satisfied
+            ),
+            getClassSpec(
+                "I",
+                nextResult.sequential.causal.pram.monotonicReads.satisfied
+            ),
+            getClassSpec(
+                "J",
+                nextResult.sequential.causal.pram.monoticWrites.satisfied
+            ),
+            getClassSpec(
+                "K",
+                nextResult.sequential.causal.pram.readYourWrites.satisfied
+            ),
+            getClassSpec("L", nextResult.sequential.causal.pram.clientOrder),
         ];
 
         const chart = `${chartDefBase}
+            ${classSpecs.join("\n")}`;
 
-${classSpecs.join("\n")}`;
+        mermaid.mermaidAPI.renderAsync("asdf", chart).then(svg => {
+            if (!containerRef) return;
+            containerRef.innerHTML = svg;
+        });
 
-        const svg = await mermaid.mermaidAPI.renderAsync("asdf", chart);
-        //setSvg(svg);
-        containerRef.innerHTML = svg;
+        setResult(nextResult);
     }
 
     createEffect(() => {
         render();
+        console.log("new result");
+        console.log(result());
     });
 
-    return <div class="results-tree" ref={containerRef}></div>;
+    return (
+        <div class="results">
+            <div class="results-tree" ref={containerRef} />
+            <div class="results-explanation">
+                <Explanation
+                    fragments={[
+                        result().realTime.explanation,
+                        result().sequential.rval.explanation,
+                        result().sequential.causal.writesFollowReads
+                            .explanation,
+                        result().sequential.causal.pram.monotonicReads
+                            .explanation,
+                        result().sequential.causal.pram.monoticWrites
+                            .explanation,
+                        result().sequential.causal.pram.readYourWrites
+                            .explanation,
+                    ].flat()}
+                />
+            </div>
+        </div>
+    );
 }
 
 interface ResultsTreeProps {

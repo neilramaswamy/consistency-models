@@ -389,8 +389,6 @@ export function isSingleOrder(
         .map(s => s.operationName)
         .join(" ");
 
-    console.log(firstSerialization);
-
     return everySerialization(
         systemSerialization,
         (processId, serialization) => {
@@ -398,7 +396,6 @@ export function isSingleOrder(
                 .filter(s => s.type !== OperationType.Read)
                 .map(s => s.operationName)
                 .join(" ");
-            console.log(other);
             return other == firstSerialization;
         }
     );
@@ -446,20 +443,21 @@ export function isPRAM(
     systemSerialization: SystemSerialization
 ) {
     const monotonicReads = isMonotonicReads(history, systemSerialization);
-    const monoticWrites = isMonotonicWrites(
-        history,
-        systemSerialization
-    ).satisfied;
+    const monoticWrites = isMonotonicWrites(history, systemSerialization);
     const readYourWrites = isReadYourWrites(history, systemSerialization);
     const clientOrder = isClientOrder(history, systemSerialization);
 
     return {
-        isMonotonicReads: monotonicReads,
-        isMonotonicWrites: monoticWrites,
-        isReadYourWrites: readYourWrites,
-        isClientOrder: clientOrder,
-        isPRAM:
-            monotonicReads && monoticWrites && readYourWrites && clientOrder,
+        monotonicReads,
+        monoticWrites,
+        readYourWrites,
+        clientOrder,
+
+        satisfied:
+            monotonicReads.satisfied &&
+            monoticWrites.satisfied &&
+            readYourWrites.satisfied &&
+            clientOrder,
     };
 }
 
@@ -471,9 +469,9 @@ export function isCausal(
     const writesFollowReads = isWritesFollowReads(history, systemSerialization);
 
     return {
-        pram: pram,
-        isWritesFollowReads: writesFollowReads,
-        isCausal: pram.isPRAM && writesFollowReads,
+        pram,
+        writesFollowReads,
+        satisfied: pram.satisfied && writesFollowReads.satisfied,
     };
 }
 
@@ -490,10 +488,11 @@ export function isSequential(
     const singleOrder = isSingleOrder(history, systemSerialization);
 
     return {
+        rval,
         causal,
-        isRval: rval,
-        isSingleOrder: singleOrder,
-        isSequential: causal.pram.isPRAM && rval.satisfied && singleOrder,
+        singleOrder,
+
+        satisfied: causal.satisfied && rval.satisfied && singleOrder,
     };
 }
 
@@ -516,7 +515,30 @@ of linearizability, since there needs to be an instantaneous moment in time wher
 effect of C becomes globally visible to all clients.
 
 To make this stricter, the implementation below enforces the following property: for each 
-visibility operation v for write w, v must overlap with w.
+visibility operation v for write w, v must overlap with w. We know that v cannot start
+before w starts, and because it must overlap, v must start before w ends. So:
+
+w.start < v.start < w.end
+
+Now, we consider the case of two write operations w1 and w2 such that w1 returns before w2.
+The original paper would dictate that w1 must come before w2 in the arbitration order. Our
+implementation implies that. For all visibility operations v1 and v2, we have that:
+
+w1.start < v1.start < w1.end AND w2.start < v2.start < w2.end
+
+We know that w1 returned before w2, so w1.end < w2.start. So, we have:
+
+w1.start < v1.start < w1.end
+AND
+w2.start < v2.start < w2.end
+AND
+w1.end < w2.start
+
+Thus:
+
+w1.start < v1.start < w1.end < w2.start < v2.start < w2.end
+
+Which implies that v1.start < v2.start. So, v1 preceeds v2 in the arbitration order.
 */
 export function isRealTime(
     history: History,
@@ -557,8 +579,8 @@ export function isLinearizable(
 
     return {
         sequential,
-        isRealTime: realTime,
-        isLinearizable: sequential.isSequential && realTime,
+        realTime: realTime,
+        isLinearizable: sequential.satisfied && realTime.satisfied,
     };
 }
 

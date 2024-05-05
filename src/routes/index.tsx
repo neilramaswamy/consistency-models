@@ -3,9 +3,8 @@ import "solid-devtools";
 import OperationView from "~/components/operationsview/OperationView";
 import OperationsView from "~/components/operationsview/OperationsView";
 import {
-    generateSerialization,
     generateHistoryFromString,
-    generateSerializationFromString,
+    generateFullSerializationFromString,
 } from "~/backend/util";
 import { ResultsTree } from "~/components/ResultsTree";
 import { createEffect, createSignal } from "solid-js";
@@ -17,7 +16,7 @@ export default function Home() {
     ---------------------[B:x->  1]---------[C:x<-  2]----------[D:x<-  3]---
     `);
 
-    const serialization = generateSerializationFromString(
+    const serialization = generateFullSerializationFromString(
         history,
         `
     ----[A:x<-  1]----------------------------[C:x<-  2]----------[D:x<-  3]-
@@ -28,7 +27,9 @@ export default function Home() {
     const [serial, setSerial] =
         createSignal<SystemSerialization>(serialization);
 
-    console.log(serialization);
+    createEffect(() => {
+        console.log(serial());
+    });
 
     return (
         <main>
@@ -44,7 +45,11 @@ export default function Home() {
                 type="Serializations"
                 history={history}
                 operations={serial()}
-                onOperationsChanged={s => setSerial(s as SystemSerialization)}
+                onOperationsChanged={s => {
+                    console.log("changed to ");
+                    console.log(s);
+                    setSerial(s as SystemSerialization);
+                }}
             />
 
             <ResultsTree history={history} systemSerialization={serial()} />
