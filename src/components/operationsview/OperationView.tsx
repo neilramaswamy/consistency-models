@@ -73,15 +73,25 @@ export default function OperationView(props: OperationsSliderProps) {
         }
     })();
 
+    let operationTypeClassName = (() => {
+        if (props.op.type == OperationType.Write) {
+            return "write";
+        } else if (props.op.type == OperationType.Read) {
+            return "read";
+        } else {
+            return "vis";
+        }
+    })();
+
     return (
         <div
             class={`operation ${
                 props.type == "Serializations" &&
                 !props.draggable &&
                 "stationary"
-            } ${props.op.type === OperationType.Read ? "read" : "write"} ${
-                props.draggable ? "draggable" : ""
-            } ${isTransparent() ? "transparent" : ""}`}
+            } ${operationTypeClassName} ${props.draggable ? "draggable" : ""} ${
+                isTransparent() ? "transparent" : ""
+            }`}
             ref={operationDiv}
             style={{
                 "--start-time": props.op.startTime,

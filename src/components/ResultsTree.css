@@ -8,5 +8,6 @@
 }
 
 .results-explanation {
+    text-align: left;
     flex: 1;
 }

@@ -36,8 +36,7 @@ export type ExplanationFragment =
       }
     | {
           type: "list";
-          ordered: boolean;
-          children: ExplanationFragment[];
+          children: ExplanationFragment[][];
       };
 
 export const monotonicReadsRegressionExplanationFragment = (
@@ -239,8 +238,12 @@ export const readYourWritesExplanationFragment = (
         },
         {
             type: "string",
+            content: `, which returned ${readOperation.value}`,
+        },
+        {
+            type: "string",
             content:
-                ", which returned a value that it never wrote and that was never visible to it.",
+                ", a value that it never wrote and that was never visible to it.",
         },
     ];
 };
@@ -250,6 +253,14 @@ export const realTimeExplanationFragment = (
     visibilityOperation: Operation
 ): ExplanationFragment[] => {
     return [
+        {
+            type: "client",
+            clientId: visibilityOperation.clientId,
+        },
+        {
+            type: "string",
+            content: "'s ",
+        },
         {
             type: "operation",
             operation: visibilityOperation,
@@ -353,8 +364,7 @@ export const fragmentsToString = (fragments: ExplanationFragment[]): string => {
                 result += fragment.content;
                 break;
             case "list":
-                result += fragment.ordered ? "1. " : "- ";
-                result += fragmentsToString(fragment.children);
+                result += fragment.children.map(f => fragmentsToString(f));
                 break;
         }
     }

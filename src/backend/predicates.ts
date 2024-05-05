@@ -19,15 +19,6 @@ import {
     Operation,
 } from "./types";
 
-function everyProcessHistory(
-    history: History,
-    callback: (processId: string, operations: Operation[]) => boolean
-) {
-    return Object.entries(history).every(([id, serialization]) =>
-        callback(id, serialization)
-    );
-}
-
 function forEachClientHistory(
     history: History,
     callback: (clientId: number, operations: Operation[]) => void
@@ -58,11 +49,34 @@ function forEachSerialization(
     );
 }
 
+function generateSummaryFromViolations(
+    modelName: string,
+    violationList: ExplanationFragment[][]
+): ExplanationFragment[] {
+    let summary: ExplanationFragment[] = [];
+
+    if (violationList.length > 0) {
+        let reasonStr = violationList.length === 1 ? "reason" : "reasons";
+
+        summary.push({
+            type: "string",
+            content: `The ${modelName} property was not satisfied for the following ${reasonStr}:`,
+        });
+
+        summary.push({
+            type: "list",
+            children: violationList,
+        });
+    }
+
+    return summary;
+}
+
 export function isRval(
     history: History,
     systemSerialization: SystemSerialization
 ): PredicateResult {
-    let violationList: ExplanationFragment[] = [];
+    let violationList: ExplanationFragment[][] = [];
 
     forEachSerialization(systemSerialization, (clientId, serialization) => {
         let lastNonReadOperation: Operation | null = null;
@@ -74,11 +88,11 @@ export function isRval(
                 // If lastValue === null, then we fail RVal. Note that you would also fail
                 // ReadYourWrites in this case.
                 if (lastNonReadOperation === null) {
-                    violationList = violationList.concat(
+                    violationList.push(
                         rValNullNonReadExplanationFragment(clientId, op)
                     );
                 } else if (lastNonReadOperation.value !== op.value) {
-                    violationList = violationList.concat(
+                    violationList.push(
                         rValExplanationFragment(
                             clientId,
                             lastNonReadOperation,
@@ -90,9 +104,14 @@ export function isRval(
         });
     });
 
+    const finalViolationList = generateSummaryFromViolations(
+        "RVal",
+        violationList
+    );
+
     return {
-        satisfied: violationList.length === 0,
-        explanation: violationList,
+        satisfied: finalViolationList.length === 0,
+        explanation: finalViolationList,
     };
 }
 
@@ -100,7 +119,7 @@ export function isReadYourWrites(
     history: History,
     systemSerialization: SystemSerialization
 ): PredicateResult {
-    let violationList: ExplanationFragment[] = [];
+    let violationList: ExplanationFragment[][] = [];
 
     forEachSerialization(systemSerialization, (clientId, serialization) => {
         let writtenValues: number[] = [];
@@ -112,7 +131,7 @@ export function isReadYourWrites(
                 let found = writtenValues.includes(op.value);
                 if (!found) {
                     // Record the violation
-                    violationList = violationList.concat(
+                    violationList.push(
                         readYourWritesExplanationFragment(clientId, op)
                     );
                 }
@@ -120,9 +139,14 @@ export function isReadYourWrites(
         });
     });
 
+    const finalViolationList = generateSummaryFromViolations(
+        "Read Your Writes",
+        violationList
+    );
+
     return {
-        satisfied: violationList.length === 0,
-        explanation: violationList,
+        satisfied: finalViolationList.length === 0,
+        explanation: finalViolationList,
     };
 }
 
@@ -132,7 +156,7 @@ export function isMonotonicWrites(
 ): PredicateResult {
     // For every pair of writes (sliding window) in every history, every serialization
     // needs to see them in that order.
-    let violationList: ExplanationFragment[] = [];
+    let violationList: ExplanationFragment[][] = [];
 
     forEachClientHistory(history, (clientHistoryId, operations) => {
         const writesInProcessHistory = operations.filter(
@@ -160,7 +184,7 @@ export function isMonotonicWrites(
                     );
 
                     if (currSerializationIndex > nextSerializationIndex) {
-                        violationList = violationList.concat(
+                        violationList.push(
                             monotonicWritesExplanationFragment(
                                 clientHistoryId,
                                 clientSerializationId,
@@ -176,9 +200,13 @@ export function isMonotonicWrites(
         }
     });
 
+    const finalViolationList = generateSummaryFromViolations(
+        "monotonic writes",
+        violationList
+    );
     return {
-        satisfied: violationList.length === 0,
-        explanation: violationList,
+        satisfied: finalViolationList.length === 0,
+        explanation: finalViolationList,
     };
 }
 
@@ -186,7 +214,7 @@ export function isMonotonicReads(
     history: History,
     systemSerialization: SystemSerialization
 ): PredicateResult {
-    let violations: ExplanationFragment[] = [];
+    let violationList: ExplanationFragment[][] = [];
 
     forEachSerialization(systemSerialization, (clientId, serialization) => {
         let writesOrVisibilities = serialization
@@ -203,7 +231,7 @@ export function isMonotonicReads(
                 // We read something we never wrote.
             } else if (writeIndex < prevWriteIndex) {
                 // We regressed on our writes.
-                violations = violations.concat(
+                violationList.push(
                     monotonicReadsRegressionExplanationFragment(
                         clientId,
                         reads[i - 1],
@@ -218,22 +246,15 @@ export function isMonotonicReads(
         }
     });
 
+    const finalViolations = generateSummaryFromViolations(
+        "monotonic reads",
+        violationList
+    );
+
     return {
-        satisfied: violations.length === 0,
-        explanation: violations,
+        satisfied: finalViolations.length === 0,
+        explanation: finalViolations,
     };
-}
-
-function setify(ops: Operation[]) {
-    let set = new Set<string>();
-
-    for (let i = 0; i < ops.length; i++) {
-        for (let j = i + 1; j < ops.length; j++) {
-            set.add(operationTupleToString(ops[i], ops[j]));
-        }
-    }
-
-    return set;
 }
 
 /**
@@ -306,7 +327,7 @@ export function isWritesFollowReads(
         return true;
     });
 
-    let violationList: ExplanationFragment[] = [];
+    let violationList: ExplanationFragment[][] = [];
 
     causalWrites.forEach(causalWriteInfo => {
         let violatingSerializations: number[] = [];
@@ -343,7 +364,7 @@ export function isWritesFollowReads(
         });
 
         if (violatingSerializations.length > 0) {
-            violationList = violationList.concat(
+            violationList.push(
                 writesFollowReadsViolatedForCausalPair(
                     causalWriteInfo.sourceWrite,
                     causalWriteInfo.read,
@@ -354,9 +375,14 @@ export function isWritesFollowReads(
         }
     });
 
+    const finalViolations = generateSummaryFromViolations(
+        "Writes Follow Reads",
+        violationList
+    );
+
     return {
-        satisfied: violationList.length === 0,
-        explanation: violationList,
+        satisfied: finalViolations.length === 0,
+        explanation: finalViolations,
     };
 }
 
@@ -549,14 +575,14 @@ export function isRealTime(
         .flat()
         .map(operation => (operationMap[operation.operationName] = operation));
 
-    let violationList: ExplanationFragment[] = [];
+    let violationList: ExplanationFragment[][] = [];
 
     forEachSerialization(systemSerialization, (clientId, serialization) => {
         serialization.forEach(operation => {
             if (operation.type === OperationType.Visibility) {
                 const sourceWrite = operationMap[operation.operationName];
                 if (!areOverlapping(sourceWrite, operation)) {
-                    violationList = violationList.concat(
+                    violationList.push(
                         realTimeExplanationFragment(sourceWrite, operation)
                     );
                 }
@@ -564,9 +590,13 @@ export function isRealTime(
         });
     });
 
+    const finalViolationList = generateSummaryFromViolations(
+        "real-time",
+        violationList
+    );
     return {
-        satisfied: violationList.length === 0,
-        explanation: violationList,
+        satisfied: finalViolationList.length === 0,
+        explanation: finalViolationList,
     };
 }
 

@@ -18,7 +18,6 @@ graph TD
     G --> I(Monotonic Reads)
     G --> J(Monotonic Writes)
     G --> K(Read Your Writes)
-    G --> L(Client Order)
 
 classDef yay fill:#33691e,color:white
 classDef no fill:#b71c1c,color:white
@@ -64,7 +63,6 @@ export function ResultsTree(props: ResultsTreeProps) {
                 "K",
                 nextResult.sequential.causal.pram.readYourWrites.satisfied
             ),
-            getClassSpec("L", nextResult.sequential.causal.pram.clientOrder),
         ];
 
         const chart = `${chartDefBase}
