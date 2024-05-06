@@ -5,6 +5,7 @@ import OperationsView from "~/components/operationsview/OperationsView";
 import {
     generateHistoryFromString,
     generateFullSerializationFromString,
+    generateAsciiDiagrams,
 } from "~/backend/util";
 import { ResultsTree } from "~/components/ResultsTree";
 import { createEffect, createSignal } from "solid-js";
@@ -12,20 +13,26 @@ import { SystemSerialization } from "~/backend/types";
 
 export default function Home() {
     const history = generateHistoryFromString(`
-    ----[A:x<-  1]-----------------------------------------------------------
-    ---------------------[B:x->  1]---------[C:x<-  2]----------[D:x<-  3]---
+    ----[A:x<- 1]----[B:x<- 2]-----------------------------------------------
+    --------------------------------[C:x-> 2]----------------[D:x-> 1]-------
     `);
 
     const serialization = generateFullSerializationFromString(
         history,
         `
-    ----[A:x<-  1]----------------------------[C:x<-  2]----------[D:x<-  3]-
-    ----[A:x<-  1]-------[B:x->  1]---------[C:x<-  2]----------[D:x<-  3]---
+    ----[A:x<- 1]----[B:x<- 2]-----------------------------------------------
+    ----[A:x<- 1]----[B:x<- 2]------[C:x-> 2]----------------[D:x-> 1]-------
     `
     );
 
     const [serial, setSerial] =
         createSignal<SystemSerialization>(serialization);
+
+    createEffect(() => {
+        const diagrams = generateAsciiDiagrams(history, serial());
+        console.log(`History:\n${diagrams.historyStr}`);
+        console.log(`Serializations:\n${diagrams.systemSerializationStr}`);
+    });
 
     return (
         <main>

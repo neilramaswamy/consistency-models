@@ -19,36 +19,11 @@ import {
     OperationType,
     Operation,
 } from "./types";
-
-function forEachClientHistory(
-    history: History,
-    callback: (clientId: number, operations: Operation[]) => void
-) {
-    return Object.entries(history).forEach(([id, serialization]) =>
-        callback(parseInt(id), serialization)
-    );
-}
-
-function everySerialization(
-    systemSerialization: SystemSerialization,
-    callback: (clientId: number, serialization: Serialization) => boolean
-) {
-    return Object.entries(systemSerialization).every(([id, serialization]) => {
-        const val = callback(parseInt(id), serialization);
-        return val;
-    });
-}
-
-function forEachSerialization(
-    systemSerialization: SystemSerialization,
-    callback: (clientId: number, serialization: Serialization) => void
-) {
-    return Object.entries(systemSerialization).forEach(
-        ([id, serialization]) => {
-            callback(parseInt(id), serialization);
-        }
-    );
-}
+import {
+    everySerialization,
+    forEachClientHistory,
+    forEachSerialization,
+} from "./util";
 
 function generateSummaryFromViolations(
     modelName: string,
@@ -470,19 +445,19 @@ export function isPRAM(
     systemSerialization: SystemSerialization
 ) {
     const monotonicReads = isMonotonicReads(history, systemSerialization);
-    const monoticWrites = isMonotonicWrites(history, systemSerialization);
+    const monotonicWrites = isMonotonicWrites(history, systemSerialization);
     const readYourWrites = isReadYourWrites(history, systemSerialization);
     const clientOrder = isClientOrder(history, systemSerialization);
 
     return {
         monotonicReads,
-        monoticWrites,
+        monotonicWrites,
         readYourWrites,
         clientOrder,
 
         satisfied:
             monotonicReads.satisfied &&
-            monoticWrites.satisfied &&
+            monotonicWrites.satisfied &&
             readYourWrites.satisfied &&
             clientOrder,
     };

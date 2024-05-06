@@ -2,8 +2,39 @@ import {
     History,
     Operation,
     OperationType,
+    Serialization,
     SystemSerialization,
 } from "./types";
+
+export function forEachClientHistory(
+    history: History,
+    callback: (clientId: number, operations: Operation[]) => void
+) {
+    return Object.entries(history).forEach(([id, serialization]) =>
+        callback(parseInt(id), serialization)
+    );
+}
+
+export function everySerialization(
+    systemSerialization: SystemSerialization,
+    callback: (clientId: number, serialization: Serialization) => boolean
+) {
+    return Object.entries(systemSerialization).every(([id, serialization]) => {
+        const val = callback(parseInt(id), serialization);
+        return val;
+    });
+}
+
+export function forEachSerialization(
+    systemSerialization: SystemSerialization,
+    callback: (clientId: number, serialization: Serialization) => void
+) {
+    return Object.entries(systemSerialization).forEach(
+        ([id, serialization]) => {
+            callback(parseInt(id), serialization);
+        }
+    );
+}
 
 const extractLinesFromStringTimeline = (s: string): string[] => {
     const processes = s
@@ -134,4 +165,74 @@ export const sortOperations = (ops: History | SystemSerialization) => {
     });
 
     return ops;
+};
+
+interface AsciiDiagrams {
+    historyStr: string;
+    systemSerializationStr: string;
+}
+
+export const generateAsciiDiagrams = (
+    history: History,
+    systemSerialization: SystemSerialization
+): AsciiDiagrams => {
+    let minimumOperationDuration = "[A:x<-1]".length - 1;
+
+    forEachSerialization(systemSerialization, (_, serialization) => {
+        serialization.forEach(op => {
+            const duration = op.endTime - op.startTime;
+            if (duration < minimumOperationDuration) {
+                throw new Error(
+                    `Cannot create ASCII representation for operation ${op.operationName}, whose duration from ${op.startTime} to ${op.endTime} is less than ${minimumOperationDuration} time units yet`
+                );
+            }
+        });
+    });
+
+    let historyLines: string[] = [];
+    forEachClientHistory(history, (_, operations) => {
+        let line = "";
+        operations.forEach(op => {
+            const padding = "-".repeat(op.startTime - line.length);
+            if (op.type === OperationType.Read) {
+                line += padding + `[${op.operationName}:x->${op.value}]`;
+            } else {
+                line += padding + `[${op.operationName}:x<-${op.value}]`;
+            }
+        });
+
+        historyLines.push(line);
+    });
+
+    let serializationLines: string[] = [];
+    forEachSerialization(systemSerialization, (_, serialization) => {
+        let line = "";
+        serialization.forEach(op => {
+            const padding = "-".repeat(op.startTime - line.length);
+            if (op.type === OperationType.Read) {
+                line += padding + `[${op.operationName}:x->${op.value}]`;
+            } else {
+                line += padding + `[${op.operationName}:x<-${op.value}]`;
+            }
+        });
+
+        serializationLines.push(line);
+    });
+
+    // Find the longest history/serialization, and extend every line to that length
+    const longestLineLength = Math.max(
+        ...historyLines.map(l => l.length),
+        ...serializationLines.map(l => l.length)
+    );
+    historyLines = historyLines.map(line => {
+        return line + "-".repeat(longestLineLength - line.length);
+    });
+    serializationLines = serializationLines.map(line => {
+        return line + "-".repeat(longestLineLength - line.length);
+    });
+
+    return {
+        historyStr: historyLines.join("\n"),
+        systemSerializationStr: serializationLines.join("\n"),
+    };
 };

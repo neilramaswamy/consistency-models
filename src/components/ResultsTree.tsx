@@ -57,7 +57,7 @@ export function ResultsTree(props: ResultsTreeProps) {
             ),
             getClassSpec(
                 "J",
-                nextResult.sequential.causal.pram.monoticWrites.satisfied
+                nextResult.sequential.causal.pram.monotonicWrites.satisfied
             ),
             getClassSpec(
                 "K",
@@ -93,7 +93,7 @@ export function ResultsTree(props: ResultsTreeProps) {
                             .explanation,
                         result().sequential.causal.pram.monotonicReads
                             .explanation,
-                        result().sequential.causal.pram.monoticWrites
+                        result().sequential.causal.pram.monotonicWrites
                             .explanation,
                         result().sequential.causal.pram.readYourWrites
                             .explanation,
