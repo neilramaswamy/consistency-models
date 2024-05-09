@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { isPRAM } from "./predicates";
+import { isLinearizable, isPRAM, isRval } from "./predicates";
 import {
     generateFullSerializationFromString,
     generateHistoryFromString,
@@ -154,18 +154,6 @@ describe("PRAM", () => {
         });
     });
 
-    // test("full program order does not imply pram", () => {
-    //     expect(isPRAM(history2, { 0: ab, 1: acbd2 })).toEqual({
-    //         // TODO(neil): It's unclear how isMonotonicReads is defined if you do not read your
-    //         // writes... For now, we set it as false.
-    //         isMonotonicReads: false,
-    //         isMonotonicWrites: true,
-    //         isReadYourWrites: false,
-    //         isClientOrder: true,
-    //         isPRAM: false,
-    //     });
-    // });
-
     // const history3 = generateHistoryFromString(`
     // ----[A:x<-1]-[B:x<-2]-------------------------
     // -----------------------[C:x->1]---[D:x->2]----
@@ -175,55 +163,79 @@ describe("PRAM", () => {
     // const acbd3 = generateSerialization(history3, "A C B D");
     // const bdac3 = generateSerialization(history3, "B D A C");
 
-    // // TODO(neil): Put this in the paper as a good example of why we should include reads in
-    // // serializations.
-    // test("serialization with multiple reads is not pram unless reads follow program order", () => {
-    //     expect(isPRAM(history3, { 0: ab3, 1: acbd3 })).toEqual({
-    //         isMonotonicReads: true,
-    //         isMonotonicWrites: true,
-    //         isReadYourWrites: true,
-    //         isClientOrder: true,
-    //         isPRAM: true,
-    //     });
+    // TODO(neil): Put this in the paper as a good example of why we should include reads in
+    // serializations.
+    test("serialization with multiple reads is not pram unless reads follow program order", () => {
+        const serialization = generateFullSerializationFromString(
+            history2,
+            `
+        ----[A:x<-1]-----[B:x<-2]----------------------------------------
+        ----[A:x<-1]-----[B:x<-2]-------[D:x->1]-----------------[C:x->2]
+        `
+        );
 
-    //     expect(isPRAM(history3, { 0: ab3, 1: bdac3 })).toEqual({
-    //         isMonotonicReads: true,
-    //         isMonotonicWrites: false,
-    //         isReadYourWrites: true,
-    //         isClientOrder: false,
-    //         isPRAM: false,
-    //     });
-    // });
+        expect(isPRAM(history2, serialization)).toMatchObject({
+            monotonicReads: {
+                satisfied: true,
+                explanation: [],
+            },
+            monotonicWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            readYourWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            clientOrder: false,
+            satisfied: false,
+        });
+    });
 });
-
-/*
 
 describe("sequential consistency", () => {
     // We will always expect: A -> C, and A -> D
     const history = generateHistoryFromString(`
-    ----[A:x<-1]---------------------------------
-    --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
+    ----[A:x<-1]----------------------------------------------------
+    ----------------[B:x->1]------------[C:x<-2]------------[D:x<-3]
     `);
 
-    const abcd = generateSerialization(history, "A C D");
-    const cdab = generateSerialization(history, "C D A B");
+    test("non-linearizable serialization can be sequentially consistent", () => {
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+    ----[A:x<-1]---------------------------------[C:x<-2]---[D:x<-3]
+    ----[A:x<-1]----[B:x->1]------------[C:x<-2]------------[D:x<-3]
+    `
+        );
 
-    const systemSerialization = { 0: abcd, 1: cdab };
+        expect(isLinearizable(history, serialization)).toMatchObject({
+            satisfied: false,
+            explanation: [],
 
-    expect(isSequential(history, systemSerialization).isSequential).toBe(false);
-    expect(isSingleOrder(history, systemSerialization)).toEqual(false);
-    expect(isPRAM(history, systemSerialization)).toHaveProperty(
-        "isPRAM",
-        false
-    );
-    expect(isRval(history, systemSerialization)).toEqual(true);
+            realTime: {
+                satisfied: false,
+                // TODO(neil): Explanation
+                // explanation: [],
+            },
 
-    expect(isWritesFollowReads(history, systemSerialization)).toBe(false);
-    expect(isCausal(history, systemSerialization)).toHaveProperty(
-        "isCausal",
-        false
-    );
+            sequential: {
+                satisfied: true,
+
+                rval: {
+                    satisfied: true,
+                    explanation: [],
+                },
+                causal: {
+                    satisfied: true,
+                },
+                singleOrder: true,
+            },
+        });
+    });
 });
+
+/*
 
 describe("writes follow reads", () => {
     // We will always expect: A -> C, and A -> D
