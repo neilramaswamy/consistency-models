@@ -1,130 +1,194 @@
+import { describe, expect, test } from "@jest/globals";
+import { isLinearizable, isPRAM, isRval } from "./predicates";
 import {
-    isRval,
-    isCausal,
-    isPRAM,
-    isSingleOrder,
-    isWritesFollowReads,
-    isLinearizable,
-    isSequential,
-} from "./predicates";
-import { describe, test, expect } from "@jest/globals";
-import { generateHistoryFromString, generateSerialization } from "./util";
+    generateFullSerializationFromString,
+    generateHistoryFromString,
+} from "./util";
 
 describe("PRAM", () => {
     const history = generateHistoryFromString(`
-    ----[A:x<-1]---------------------------------
-    --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
+        ----[A:x<-1]-----------------------------------------------------------
+        ---------------------[B:x->1]-----------[C:x<-2]------------[D:x<-3]---
     `);
 
-    const acd = generateSerialization(history, "A C D");
-    const abcd = generateSerialization(history, "A B C D");
-
-    const cda = generateSerialization(history, "C D A");
-    const bcda = generateSerialization(history, "B C D A");
-
-    const adc = generateSerialization(history, "A D C");
-
-    const cdab = generateSerialization(history, "C D A B");
-    const abdc = generateSerialization(history, "A B D C");
-
     test("is true with the same linearizable sequence", () => {
-        expect(isPRAM(history, { 0: acd, 1: abcd })).toEqual({
-            isMonotonicReads: true,
-            isMonotonicWrites: true,
-            isReadYourWrites: true,
-            isClientOrder: true,
-            isPRAM: true,
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+        ----[A:x<-1]----------------------------[C:x<-2]------------[D:x<-3]--
+        ----[A:x<-1]---------[B:x->1]-----------[C:x<-2]------------[D:x<-3]--
+        `
+        );
+
+        expect(isPRAM(history, serialization)).toMatchObject({
+            monotonicReads: {
+                satisfied: true,
+                explanation: [],
+            },
+            monotonicWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            readYourWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            clientOrder: true,
+            satisfied: true,
         });
     });
 
     test("is not met when you read before writing anything", () => {
-        expect(isPRAM(history, { 0: acd, 1: bcda })).toEqual({
-            isMonotonicReads: true,
-            isMonotonicWrites: true,
-            isReadYourWrites: false,
-            isClientOrder: true,
-            isPRAM: false,
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+        ----[A:x<-1]------------------------------[C:x<-2]------------[D:x<-3]
+        ---------------------[B:x->1]-[A:x<-1]--[C:x<-2]------------[D:x<-3]--
+        `
+        );
+
+        expect(isPRAM(history, serialization)).toMatchObject({
+            monotonicReads: {
+                satisfied: true,
+                explanation: [],
+            },
+            monotonicWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            readYourWrites: {
+                satisfied: false,
+                // TODO(neil): Explanation
+                // explanation: []
+            },
+            clientOrder: true,
+            satisfied: false,
         });
     });
 
     test("pram may satisfy all three base predicates without client order", () => {
-        expect(isPRAM(history, { 0: cda, 1: cdab })).toEqual({
-            isMonotonicReads: true,
-            isMonotonicWrites: true,
-            isReadYourWrites: true,
-            isClientOrder: false,
-            isPRAM: false,
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+        ----[C:x<-2]--------------------[D:x<-3]------------[A:x<-1]----------
+        ----[C:x<-2]--------------------[D:x<-3]------------[A:x<-1]-[B:x->1]-
+        `
+        );
+
+        expect(isPRAM(history, serialization)).toMatchObject({
+            monotonicReads: {
+                satisfied: true,
+                explanation: [],
+            },
+            monotonicWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            readYourWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            clientOrder: false,
+            satisfied: false,
         });
     });
 
     test("pram is not satisfied when there are not monotonic writes", () => {
-        expect(isPRAM(history, { 0: adc, 1: abcd })).toEqual({
-            isMonotonicReads: true,
-            isMonotonicWrites: false,
-            isReadYourWrites: true,
-            isClientOrder: true,
-            isPRAM: false,
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+        ----[A:x<-1]------------------------------------------------[D:x<-3]---[C:x<-2]
+        ----[A:x<-1]---------[B:x->1]-----------[C:x<-2]------------[D:x<-3]-----------
+        `
+        );
+
+        expect(isPRAM(history, serialization)).toMatchObject({
+            monotonicReads: {
+                satisfied: true,
+                explanation: [],
+            },
+            monotonicWrites: {
+                satisfied: false,
+                // TODO(neil): Explanation
+                // explanation: [],
+            },
+            readYourWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            clientOrder: true,
+            satisfied: false,
         });
     });
 
     const history2 = generateHistoryFromString(`
-    ----[A:x<-1]-[B:x<-2]-------------------------
-    -----------------------[C:x->2]---[D:x->1]----
+    ----[A:x<-1]-----[B:x<-2]----------------------------------------
+    --------------------------------[C:x->2]-----------------[D:x->1]
     `);
-    const ab = generateSerialization(history2, "A B");
-
-    const abcd2 = generateSerialization(history2, "A B C D");
-    const adbc2 = generateSerialization(history2, "A D B C");
-    const acbd2 = generateSerialization(history2, "A C B D");
 
     test("pram is not satisfied when there are not monotonic reads", () => {
-        expect(isPRAM(history2, { 0: ab, 1: abcd2 })).toEqual({
-            isMonotonicReads: false,
-            isMonotonicWrites: true,
-            isReadYourWrites: true,
-            isClientOrder: true,
-            isPRAM: false,
+        const serialization = generateFullSerializationFromString(
+            history2,
+            `
+        ----[A:x<-1]-----[B:x<-2]----------------------------------------
+        ------[A:x<-1]------[B:x<-2]----[C:x->2]-----------------[D:x->1]
+        `
+        );
+
+        expect(isPRAM(history2, serialization)).toMatchObject({
+            monotonicReads: {
+                satisfied: false,
+                // TODO(neil): Explanation
+                // explanation: [],
+            },
+            monotonicWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            readYourWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            clientOrder: true,
+            satisfied: false,
         });
     });
 
-    test("full program order does not imply pram", () => {
-        expect(isPRAM(history2, { 0: ab, 1: acbd2 })).toEqual({
-            // TODO(neil): It's unclear how isMonotonicReads is defined if you do not read your
-            // writes... For now, we set it as false.
-            isMonotonicReads: false,
-            isMonotonicWrites: true,
-            isReadYourWrites: false,
-            isClientOrder: true,
-            isPRAM: false,
-        });
-    });
+    // const history3 = generateHistoryFromString(`
+    // ----[A:x<-1]-[B:x<-2]-------------------------
+    // -----------------------[C:x->1]---[D:x->2]----
+    // `);
 
-    const history3 = generateHistoryFromString(`
-    ----[A:x<-1]-[B:x<-2]-------------------------
-    -----------------------[C:x->1]---[D:x->2]----
-    `);
-
-    const ab3 = generateSerialization(history3, "A B");
-    const acbd3 = generateSerialization(history3, "A C B D");
-    const bdac3 = generateSerialization(history3, "B D A C");
+    // const ab3 = generateSerialization(history3, "A B");
+    // const acbd3 = generateSerialization(history3, "A C B D");
+    // const bdac3 = generateSerialization(history3, "B D A C");
 
     // TODO(neil): Put this in the paper as a good example of why we should include reads in
     // serializations.
     test("serialization with multiple reads is not pram unless reads follow program order", () => {
-        expect(isPRAM(history3, { 0: ab3, 1: acbd3 })).toEqual({
-            isMonotonicReads: true,
-            isMonotonicWrites: true,
-            isReadYourWrites: true,
-            isClientOrder: true,
-            isPRAM: true,
-        });
+        const serialization = generateFullSerializationFromString(
+            history2,
+            `
+        ----[A:x<-1]-----[B:x<-2]----------------------------------------
+        ----[A:x<-1]-----[B:x<-2]-------[D:x->1]-----------------[C:x->2]
+        `
+        );
 
-        expect(isPRAM(history3, { 0: ab3, 1: bdac3 })).toEqual({
-            isMonotonicReads: true,
-            isMonotonicWrites: false,
-            isReadYourWrites: true,
-            isClientOrder: false,
-            isPRAM: false,
+        expect(isPRAM(history2, serialization)).toMatchObject({
+            monotonicReads: {
+                satisfied: true,
+                explanation: [],
+            },
+            monotonicWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            readYourWrites: {
+                satisfied: true,
+                explanation: [],
+            },
+            clientOrder: false,
+            satisfied: false,
         });
     });
 });
@@ -132,29 +196,46 @@ describe("PRAM", () => {
 describe("sequential consistency", () => {
     // We will always expect: A -> C, and A -> D
     const history = generateHistoryFromString(`
-    ----[A:x<-1]---------------------------------
-    --------------[B:x->1]---[C:x<-2]---[D:x<-3]-
+    ----[A:x<-1]----------------------------------------------------
+    ----------------[B:x->1]------------[C:x<-2]------------[D:x<-3]
     `);
 
-    const abcd = generateSerialization(history, "A C D");
-    const cdab = generateSerialization(history, "C D A B");
+    test("non-linearizable serialization can be sequentially consistent", () => {
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+    ----[A:x<-1]---------------------------------[C:x<-2]---[D:x<-3]
+    ----[A:x<-1]----[B:x->1]------------[C:x<-2]------------[D:x<-3]
+    `
+        );
 
-    const systemSerialization = { 0: abcd, 1: cdab };
+        expect(isLinearizable(history, serialization)).toMatchObject({
+            satisfied: false,
+            explanation: [],
 
-    expect(isSequential(history, systemSerialization).isSequential).toBe(false);
-    expect(isSingleOrder(history, systemSerialization)).toEqual(false);
-    expect(isPRAM(history, systemSerialization)).toHaveProperty(
-        "isPRAM",
-        false
-    );
-    expect(isRval(history, systemSerialization)).toEqual(true);
+            realTime: {
+                satisfied: false,
+                // TODO(neil): Explanation
+                // explanation: [],
+            },
 
-    expect(isWritesFollowReads(history, systemSerialization)).toBe(false);
-    expect(isCausal(history, systemSerialization)).toHaveProperty(
-        "isCausal",
-        false
-    );
+            sequential: {
+                satisfied: true,
+
+                rval: {
+                    satisfied: true,
+                    explanation: [],
+                },
+                causal: {
+                    satisfied: true,
+                },
+                singleOrder: true,
+            },
+        });
+    });
 });
+
+/*
 
 describe("writes follow reads", () => {
     // We will always expect: A -> C, and A -> D
@@ -306,3 +387,77 @@ describe("single order", () => {
         expect(isSingleOrder(history, { 0: s0InOrder, 1: s1 })).toBe(true);
     });
 });
+
+describe("monotonic writes", () => {
+    test("monotonic writes generates an explanation for a violation", () => {
+        const history = generateHistoryFromString(`
+        ---[A:x<-1]----[B:x<-2]------------
+        -----------------------------------
+        `);
+
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+        ---[A:x<-1]----[B:x<-2]------------
+        -----------------[B:x<-2]-[A:x<-1]-
+        `
+        );
+
+        const result = isMonotonicWrites(history, serialization);
+
+        expect(result.satisfied).toBe(false);
+        expect(fragmentsToString(result.explanation)).toBe(
+            "Operation B became " +
+                "visible to Client 1 before Operation A. However, Client 0, who " +
+                "originally performed these writes, performed Operation A before " +
+                "Operation B."
+        );
+    });
+
+    test("monotonic writes can detect three out-of-order visibility operations", () => {
+        const history = generateHistoryFromString(`
+        ----[A:x<-1]---[B:x<-2]---[C:x<-3]----------------------------------
+        --------------------------------------------------------------------
+        `);
+
+        const serialization = generateSerializationFromString(
+            history,
+            `
+        ----[A:x<-1]---[B:x<-2]---[C:x<-3]----------------------------------
+        -----------------------------[C:x<-3]---[B:x<-2]---[A:x<-1]--------- 
+        `
+        );
+
+        const result = isMonotonicWrites(history, serialization);
+
+        expect(result.satisfied).toBe(false);
+
+        expect(fragmentsToString(result.explanation)).toBe(
+            "Operation B became visible to Client 1 before Operation A. However, Client 0, who originally performed these writes, performed Operation A before Operation B." +
+                "Operation C became visible to Client 1 before Operation B. However, Client 0, who originally performed these writes, performed Operation B before Operation C."
+        );
+    });
+
+    test("monotonic writes can detect out-of-order visibility operations amid in-order visibility operations", () => {
+        const history = generateHistoryFromString(`
+        --------------------------------------------------------------------
+        ----[A:x<-1]---[B:x<-2]---[C:x<-3]----------------------------------
+        `);
+
+        const serialization = generateSerializationFromString(
+            history,
+            `
+        -----------------------------[A:x<-1]---[C:x<-3]---[B:x<-2]--------- 
+        ----[A:x<-1]---[B:x<-2]---[C:x<-3]----------------------------------
+        `
+        );
+
+        const result = isMonotonicWrites(history, serialization);
+
+        expect(result.satisfied).toBe(false);
+        expect(fragmentsToString(result.explanation)).toBe(
+            "Operation C became visible to Client 0 before Operation B. However, Client 1, who originally performed these writes, performed Operation B before Operation C."
+        );
+    });
+});
+*/

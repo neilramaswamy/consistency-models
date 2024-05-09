@@ -1,0 +1,14 @@
+.active {
+    background-color: #03a9f44a;
+}
+
+.link {
+    color: black;
+    border-radius: 5px;
+    text-decoration: none;
+    padding: 8px;
+}
+
+.link:hover {
+    background-color: #03a9f44a;
+}

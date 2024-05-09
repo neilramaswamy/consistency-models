@@ -20,6 +20,7 @@
 
 .stationary {
     filter: contrast(0.6);
+    cursor: not-allowed;
 }
 
 .transparent {
@@ -45,6 +46,10 @@
 
 .operation.read {
     background: #f44336;
+}
+
+.operation.vis {
+    background: #4493f8;
 }
 
 .info {

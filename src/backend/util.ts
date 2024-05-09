@@ -2,8 +2,39 @@ import {
     History,
     Operation,
     OperationType,
+    Serialization,
     SystemSerialization,
 } from "./types";
+
+export function forEachClientHistory(
+    history: History,
+    callback: (clientId: number, operations: Operation[]) => void
+) {
+    return Object.entries(history).forEach(([id, serialization]) =>
+        callback(parseInt(id), serialization)
+    );
+}
+
+export function everySerialization(
+    systemSerialization: SystemSerialization,
+    callback: (clientId: number, serialization: Serialization) => boolean
+) {
+    return Object.entries(systemSerialization).every(([id, serialization]) => {
+        const val = callback(parseInt(id), serialization);
+        return val;
+    });
+}
+
+export function forEachSerialization(
+    systemSerialization: SystemSerialization,
+    callback: (clientId: number, serialization: Serialization) => void
+) {
+    return Object.entries(systemSerialization).forEach(
+        ([id, serialization]) => {
+            callback(parseInt(id), serialization);
+        }
+    );
+}
 
 const extractLinesFromStringTimeline = (s: string): string[] => {
     const processes = s
@@ -40,47 +71,47 @@ const extractLinesFromStringTimeline = (s: string): string[] => {
  * @param h the string-based representation of a history
  */
 export const generateHistoryFromString = (h: string): History => {
-    const processes = extractLinesFromStringTimeline(h);
+    const clientHistories = extractLinesFromStringTimeline(h);
 
     let history: History = {};
-    processes.forEach((line, proc) => {
-        const operations: Operation[] = generateSessionProjection(line).map(
-            // Add the isOriginal property here, since we know that all operations in a history
-            // are original, i.e. not a result of message passing
-            op => ({ ...op, isOriginal: true })
+    clientHistories.forEach((clientHistory, clientId) => {
+        const operations: Operation[] = generateOperationsFromString(
+            clientId,
+            clientHistory
         );
-        history[proc] = operations;
+        history[clientId] = operations;
     });
 
     return history;
 };
 
-export const generateSerializationFromString = (
+export const generateFullSerializationFromString = (
     history: History,
     s: string
 ): SystemSerialization => {
-    const serializations = extractLinesFromStringTimeline(s);
+    const clientSerializations = extractLinesFromStringTimeline(s);
 
     let systemSerialization: SystemSerialization = {};
-    serializations.forEach((line, proc) => {
-        const currProcHistory = history[proc];
+    clientSerializations.forEach((clientSerialization, clientId) => {
+        const currClientHistory = history[clientId];
 
-        const operations: Operation[] = generateSessionProjection(line).map(
-            op => {
-                // If this operation exists in the current process history, then its original.
-                const originalOp = currProcHistory.find(
-                    historyOp => historyOp.operationName == op.operationName
-                );
+        const operations: Operation[] = generateOperationsFromString(
+            clientId,
+            clientSerialization
+        ).map(op => {
+            // If this operation exists in the current process history, then its original.
+            const originalOp = currClientHistory.find(
+                historyOp => historyOp.operationName == op.operationName
+            );
 
-                if (originalOp) {
-                    return originalOp;
-                } else {
-                    return { ...op, isOriginal: false };
-                }
+            if (originalOp) {
+                return originalOp;
+            } else {
+                return { ...op, type: OperationType.Visibility };
             }
-        );
+        });
 
-        systemSerialization[proc] = operations;
+        systemSerialization[clientId] = operations;
     });
 
     return systemSerialization;
@@ -92,23 +123,19 @@ export const generateSerializationFromString = (
 //
 // into a list of operations. The operations don't have the isOriginal property, since that can't
 // be inferred using just the given string.
-export const generateSessionProjection = (
+export const generateOperationsFromString = (
+    clientId: number,
     line: string
-): Omit<Operation, "isOriginal">[] => {
-    let operations: Omit<Operation, "isOriginal">[] = [];
+): Operation[] => {
+    let operations: Operation[] = [];
 
     const regex = /\[([A-Z]):([a-z])(<-|->)\s*(\d)\]/g;
     const matches = line.matchAll(regex);
 
     for (const match of matches) {
         const operationName = match[1];
-        // const obj = match[2];
         const arrow = match[3];
         const value = parseInt(match[4], 10);
-        // assert(
-        //     match.index !== undefined,
-        //     `Match index was undefined for ${match}`
-        // )
 
         const type = arrow === "->" ? OperationType.Read : OperationType.Write;
 
@@ -117,9 +144,11 @@ export const generateSessionProjection = (
         const endTime = startTime + match[0].length - 1;
 
         operations.push({
-            operationName,
-
             type,
+
+            isHistory: true,
+            clientId,
+            operationName,
             value,
 
             startTime,
@@ -130,29 +159,80 @@ export const generateSessionProjection = (
     return operations;
 };
 
-/**
- * Generates an array of Operations using a history and a list of processId names separated by
- * space.
- */
-export const generateSerialization = (
-    history: History,
-    serialization: string
-): Operation[] => {
-    const map: { [key: string]: Operation } = {};
-    Object.values(history)
-        .flatMap(_ => _)
-        .forEach(
-            operation => (map[operation.operationName] = { ...operation })
-        );
-
-    const operationIds = serialization.split(" ");
-    return operationIds.map(operationId => map[operationId]);
-};
-
 export const sortOperations = (ops: History | SystemSerialization) => {
     Object.values(ops).forEach((arr: Operation[]) => {
         arr.sort((a, b) => a.startTime - b.startTime);
     });
 
     return ops;
+};
+
+interface AsciiDiagrams {
+    historyStr: string;
+    systemSerializationStr: string;
+}
+
+export const generateAsciiDiagrams = (
+    history: History,
+    systemSerialization: SystemSerialization
+): AsciiDiagrams => {
+    let minimumOperationDuration = "[A:x<-1]".length - 1;
+
+    forEachSerialization(systemSerialization, (_, serialization) => {
+        serialization.forEach(op => {
+            const duration = op.endTime - op.startTime;
+            if (duration < minimumOperationDuration) {
+                throw new Error(
+                    `Cannot create ASCII representation for operation ${op.operationName}, whose duration from ${op.startTime} to ${op.endTime} is less than ${minimumOperationDuration} time units yet`
+                );
+            }
+        });
+    });
+
+    let historyLines: string[] = [];
+    forEachClientHistory(history, (_, operations) => {
+        let line = "";
+        operations.forEach(op => {
+            const padding = "-".repeat(op.startTime - line.length);
+            if (op.type === OperationType.Read) {
+                line += padding + `[${op.operationName}:x->${op.value}]`;
+            } else {
+                line += padding + `[${op.operationName}:x<-${op.value}]`;
+            }
+        });
+
+        historyLines.push(line);
+    });
+
+    let serializationLines: string[] = [];
+    forEachSerialization(systemSerialization, (_, serialization) => {
+        let line = "";
+        serialization.forEach(op => {
+            const padding = "-".repeat(op.startTime - line.length);
+            if (op.type === OperationType.Read) {
+                line += padding + `[${op.operationName}:x->${op.value}]`;
+            } else {
+                line += padding + `[${op.operationName}:x<-${op.value}]`;
+            }
+        });
+
+        serializationLines.push(line);
+    });
+
+    // Find the longest history/serialization, and extend every line to that length
+    const longestLineLength = Math.max(
+        ...historyLines.map(l => l.length),
+        ...serializationLines.map(l => l.length)
+    );
+    historyLines = historyLines.map(line => {
+        return line + "-".repeat(longestLineLength - line.length);
+    });
+    serializationLines = serializationLines.map(line => {
+        return line + "-".repeat(longestLineLength - line.length);
+    });
+
+    return {
+        historyStr: historyLines.join("\n"),
+        systemSerializationStr: serializationLines.join("\n"),
+    };
 };

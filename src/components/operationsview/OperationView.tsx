@@ -63,15 +63,35 @@ export default function OperationView(props: OperationsSliderProps) {
         moveDrag(e.touches[0]);
     };
 
+    let characterDescriptor = (() => {
+        if (props.op.type == OperationType.Write) {
+            return "W";
+        } else if (props.op.type == OperationType.Read) {
+            return "R";
+        } else {
+            return "V";
+        }
+    })();
+
+    let operationTypeClassName = (() => {
+        if (props.op.type == OperationType.Write) {
+            return "write";
+        } else if (props.op.type == OperationType.Read) {
+            return "read";
+        } else {
+            return "vis";
+        }
+    })();
+
     return (
         <div
             class={`operation ${
                 props.type == "Serializations" &&
                 !props.draggable &&
                 "stationary"
-            } ${props.op.type === OperationType.Read ? "read" : "write"} ${
-                props.draggable ? "draggable" : ""
-            } ${isTransparent() ? "transparent" : ""}`}
+            } ${operationTypeClassName} ${props.draggable ? "draggable" : ""} ${
+                isTransparent() ? "transparent" : ""
+            }`}
             ref={operationDiv}
             style={{
                 "--start-time": props.op.startTime,
@@ -85,11 +105,7 @@ export default function OperationView(props: OperationsSliderProps) {
         >
             <span class="name">{props.op.operationName}</span>
             <div class="info">
-                <span>
-                    {`${props.op.type === OperationType.Read ? "R" : "W"}(${
-                        props.op.value
-                    })`}
-                </span>
+                <span>{`${characterDescriptor}(${props.op.value})`}</span>
             </div>
         </div>
     );

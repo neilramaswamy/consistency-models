@@ -1,3 +1,13 @@
-.results-tree {
+.results {
     display: flex;
+    justify-content: space-between;
+}
+
+.results-tree {
+    flex: 1;
+}
+
+.results-explanation {
+    text-align: left;
+    flex: 1;
 }
