@@ -61,9 +61,9 @@ export const monotonicReadsRegressionExplanationFragment = (
         },
         {
             type: "string",
-            content: `, which returned the value from ${operationTypeToString(
+            content: `, which returned the value from a ${operationTypeToString(
                 firstWriteOrVisibility.type
-            )}`,
+            )} operation, `,
         },
         {
             type: "operation",

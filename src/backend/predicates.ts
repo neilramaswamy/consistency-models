@@ -186,38 +186,73 @@ export function isMonotonicWrites(
     };
 }
 
+function findIssuingClientAndOperationIndex(
+    history: History,
+    operation: Operation
+) {
+    let issuingClientId = -1;
+    let operationIndex = -1;
+
+    forEachClientHistory(history, (clientId, operations) => {
+        const index = operations.findIndex(
+            o => o.value === operation.value && o.type == OperationType.Write
+        );
+        if (index >= 0) {
+            issuingClientId = clientId;
+            operationIndex = index;
+        }
+    });
+
+    return { issuingClientId, operationIndex };
+}
+
 export function isMonotonicReads(
     history: History,
     systemSerialization: SystemSerialization
 ): PredicateResult {
     let violationList: ExplanationFragment[][] = [];
 
+    // In each serialization, for each read operation, we need to remember
+    // what process it came from. Then for the next read, we need to find
+    // its process, and verify that this second read is at a higher index
+    // than the original read.
+
     forEachSerialization(systemSerialization, (clientId, serialization) => {
-        let writesOrVisibilities = serialization
-            .filter(o => o.type !== OperationType.Read)
-            .map(o => o.value);
         let reads = serialization.filter(o => o.type === OperationType.Read);
 
-        let prevWriteIndex = -1;
+        const clientToLatestWriteIndex: { [key: number]: number } = {};
+
         for (let i = 0; i < reads.length; i++) {
             const read = reads[i];
-            const writeIndex = writesOrVisibilities.indexOf(read.value);
 
-            if (writeIndex < 0) {
-                // We read something we never wrote.
-            } else if (writeIndex < prevWriteIndex) {
-                // We regressed on our writes.
-                violationList.push(
-                    monotonicReadsRegressionExplanationFragment(
-                        clientId,
-                        reads[i - 1],
-                        serialization[prevWriteIndex],
-                        reads[i],
-                        serialization[writeIndex]
-                    )
-                );
+            const { issuingClientId, operationIndex } =
+                findIssuingClientAndOperationIndex(history, read);
+
+            if (issuingClientId < 0 || operationIndex < 0) {
+                // This is a degenerate case, I think. So we won't report
+                // it as a violation, but it's worth commenting about.
             } else {
-                prevWriteIndex = writeIndex;
+                if (clientToLatestWriteIndex[issuingClientId] === undefined) {
+                    clientToLatestWriteIndex[issuingClientId] = operationIndex;
+                } else {
+                    // Make sure that for this client, the write index is increasing
+                    const prevWriteIndex =
+                        clientToLatestWriteIndex[issuingClientId];
+                    if (operationIndex < prevWriteIndex) {
+                        violationList.push(
+                            monotonicReadsRegressionExplanationFragment(
+                                clientId,
+                                reads[i - 1], // I don't know about this line.
+                                serialization[prevWriteIndex],
+                                read,
+                                serialization[operationIndex]
+                            )
+                        );
+                    } else {
+                        clientToLatestWriteIndex[issuingClientId] =
+                            operationIndex;
+                    }
+                }
             }
         }
     });

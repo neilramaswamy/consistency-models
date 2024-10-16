@@ -68,9 +68,9 @@ export function ResultsTree(props: ResultsTreeProps) {
         const chart = `${chartDefBase}
             ${classSpecs.join("\n")}`;
 
-        mermaid.mermaidAPI.renderAsync("asdf", chart).then(svg => {
+        mermaid.render("asdf", chart).then(svg => {
             if (!containerRef) return;
-            containerRef.innerHTML = svg;
+            containerRef.innerHTML = svg.svg;
         });
 
         setResult(nextResult);

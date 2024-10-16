@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { isLinearizable, isPRAM, isRval } from "./predicates";
+import { isLinearizable, isMonotonicReads, isPRAM, isRval } from "./predicates";
 import {
     generateFullSerializationFromString,
     generateHistoryFromString,
@@ -232,6 +232,25 @@ describe("sequential consistency", () => {
                 singleOrder: true,
             },
         });
+    });
+});
+
+describe("monotonic reads", () => {
+    const history = generateHistoryFromString(`
+    ----[A:x<-1]------[B:x<-2]----------------------------------------
+    --------------------------------[C:x->2]------------------[D:x->1]
+    `);
+
+    test("read operations without any visibility operations", () => {
+        const serialization = generateFullSerializationFromString(
+            history,
+            `
+        ----[A:x<-1]------[B:x<-2]----------------------------------------
+        ---------------------[B:x<-2]---[C:x->2]-----[A:x<-1]-----[D:x->1]
+        `
+        );
+
+        expect(isMonotonicReads(history, serialization).satisfied).toBe(false);
     });
 });
 
